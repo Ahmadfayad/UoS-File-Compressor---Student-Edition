@@ -1,0 +1,3579 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8" />
+	<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+	<title>UoS File Compressor</title>
+
+	<script src="https://cdn.jsdelivr.net/npm/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
+	<script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js"></script>
+
+	<style>
+		@import url("https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap");
+
+		*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+		:root {
+			--green: #174f23;
+			--green-light: #2f7a3f;
+			--green-soft: #62b46d;
+			--mint: #dff4e1;
+			--gold: #c5960c;
+			--cream: #fffaf0;
+			--red: #d32f2f;
+			--text: #162018;
+			--muted: #617364;
+			--surface: rgba(255, 255, 255, 0.78);
+			--surface-strong: rgba(255, 255, 255, 0.92);
+			--border: rgba(23, 79, 35, 0.12);
+			--shadow-soft: 0 20px 70px rgba(31, 45, 32, 0.08);
+			--shadow-card: 0 18px 40px rgba(18, 37, 22, 0.08);
+		}
+
+		html { font-size: 16px; }
+
+		body {
+			min-height: 100vh;
+			font-family: "Plus Jakarta Sans", "Segoe UI", -apple-system, BlinkMacSystemFont, sans-serif;
+			color: var(--text);
+			background:
+				radial-gradient(circle at top left, rgba(98, 180, 109, 0.16), transparent 30%),
+				radial-gradient(circle at 85% 20%, rgba(197, 150, 12, 0.12), transparent 24%),
+				radial-gradient(circle at bottom right, rgba(23, 79, 35, 0.1), transparent 26%),
+				linear-gradient(180deg, #f8fbf6 0%, #eef5ed 48%, #f9faf5 100%);
+		}
+
+		.page {
+			min-height: 100vh;
+			display: flex;
+			flex-direction: column;
+			position: relative;
+			overflow: hidden;
+			isolation: isolate;
+		}
+
+		.page::before,
+		.page::after {
+			content: "";
+			position: fixed;
+			inset: auto;
+			pointer-events: none;
+			z-index: 0;
+			filter: blur(10px);
+		}
+
+		.page::before {
+			width: 420px;
+			height: 420px;
+			top: -120px;
+			right: -120px;
+			background: radial-gradient(circle, rgba(255, 227, 161, 0.36), transparent 62%);
+		}
+
+		.page::after {
+			width: 520px;
+			height: 520px;
+			left: -180px;
+			bottom: -180px;
+			background: radial-gradient(circle, rgba(163, 226, 175, 0.26), transparent 62%);
+		}
+
+		.particles {
+			position: fixed;
+			inset: 0;
+			pointer-events: none;
+			z-index: 0;
+			overflow: hidden;
+		}
+
+		.particle {
+			position: absolute;
+			border-radius: 50%;
+			animation: floatUp linear infinite;
+		}
+
+		@keyframes floatUp {
+			0% { transform: translateY(100vh) scale(0); opacity: 0; }
+			10%, 90% { opacity: 0.6; }
+			100% { transform: translateY(-10vh) scale(1); opacity: 0; }
+		}
+
+		header {
+			position: sticky;
+			top: 0;
+			z-index: 10;
+			backdrop-filter: blur(22px) saturate(170%);
+			background: rgba(255, 255, 255, 0.62);
+			border-bottom: 1px solid rgba(23, 79, 35, 0.07);
+			box-shadow: 0 8px 24px rgba(29, 43, 31, 0.04);
+		}
+
+		.header-inner,
+		.info-inner,
+		.footer-inner {
+			max-width: 980px;
+			margin: 0 auto;
+			padding-left: 20px;
+			padding-right: 20px;
+		}
+
+		.header-inner {
+			min-height: 88px;
+			display: flex;
+			align-items: center;
+			justify-content: space-between;
+			gap: 16px;
+			position: relative;
+		}
+
+		.brand {
+			display: flex;
+			align-items: center;
+			gap: 0;
+			min-width: 0;
+		}
+
+		.brand img {
+			height: 66px;
+			width: auto;
+			object-fit: contain;
+			display: block;
+			flex-shrink: 0;
+			filter: drop-shadow(0 10px 24px rgba(27, 94, 32, 0.1));
+		}
+
+		.brand-text { display: none; }
+
+		.header-actions {
+			display: flex;
+			align-items: center;
+			gap: 10px;
+			flex-shrink: 0;
+		}
+
+		.engine-badge {
+			display: none;
+		}
+
+		.engine-dot {
+			width: 8px;
+			height: 8px;
+			border-radius: 50%;
+			background: var(--green);
+			flex-shrink: 0;
+		}
+
+		.engine-dot.loading {
+			background: var(--gold);
+			animation: pulse 1.2s ease-in-out infinite;
+		}
+
+		.engine-dot.partial { background: var(--gold); }
+		.engine-dot.fallback { background: #1565C0; }
+		.engine-dot.error { background: var(--red); }
+
+		@keyframes pulse {
+			0%, 100% { opacity: 1; }
+			50% { opacity: 0.35; }
+		}
+
+		.icon-btn {
+			width: 40px;
+			height: 40px;
+			border: 0;
+			border-radius: 999px;
+			background: rgba(255, 255, 255, 0.6);
+			color: var(--green);
+			cursor: pointer;
+			box-shadow: 0 8px 24px rgba(29, 43, 31, 0.06);
+			transition: background 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
+		}
+
+		.icon-btn:hover {
+			background: rgba(255, 255, 255, 0.92);
+			transform: translateY(-1px);
+			box-shadow: 0 12px 28px rgba(29, 43, 31, 0.09);
+		}
+
+		#info-banner {
+			overflow: hidden;
+			max-height: 0;
+			transition: max-height 0.35s ease;
+			background: linear-gradient(180deg, rgba(248, 253, 248, 0.9), rgba(241, 247, 240, 0.94));
+			border-bottom: 1px solid rgba(23, 79, 35, 0.06);
+		}
+
+		#info-banner.open { max-height: 220px; }
+
+		.info-inner {
+			display: flex;
+			align-items: flex-start;
+			gap: 14px;
+			padding-top: 16px;
+			padding-bottom: 16px;
+		}
+
+		.info-copy h3 {
+			font-size: 14px;
+			font-weight: 800;
+			color: var(--green);
+			margin-bottom: 6px;
+		}
+
+		.info-copy p {
+			font-size: 12px;
+			line-height: 1.7;
+			color: var(--muted);
+		}
+
+		main {
+			position: relative;
+			z-index: 1;
+			width: 100%;
+			max-width: 820px;
+			margin: 0 auto;
+			padding: 44px 20px 34px;
+			flex: 1;
+		}
+
+		.title {
+			text-align: center;
+			margin-bottom: 24px;
+			display: flex;
+			flex-direction: column;
+			align-items: center;
+			gap: 10px;
+		}
+
+		.title-badge {
+			display: inline-flex;
+			align-items: center;
+			gap: 8px;
+			padding: 7px 14px;
+			border-radius: 999px;
+			background: rgba(255, 255, 255, 0.78);
+			border: 1px solid rgba(23, 79, 35, 0.08);
+			font-size: 11px;
+			font-weight: 800;
+			color: var(--green);
+			box-shadow: 0 12px 30px rgba(26, 38, 27, 0.06);
+		}
+
+		.title h2 {
+			max-width: 900px;
+			font-size: clamp(22px, 3vw, 36px);
+			line-height: 1.12;
+			font-weight: 900;
+			color: var(--green);
+			letter-spacing: -0.04em;
+			white-space: nowrap;
+		}
+
+		.title p {
+			max-width: 520px;
+			font-size: 14px;
+			line-height: 1.6;
+			color: var(--muted);
+		}
+
+		.mode-switch {
+			display: grid;
+			justify-items: center;
+			gap: 10px;
+			margin: 0 auto 24px;
+		}
+
+		.mode-switch-label {
+			font-size: 11px;
+			font-weight: 800;
+			letter-spacing: 0.12em;
+			text-transform: uppercase;
+			color: rgba(37, 61, 41, 0.68);
+		}
+
+		.mode-tabs {
+			display: flex;
+			align-items: center;
+			justify-content: center;
+			gap: 0;
+			width: fit-content;
+			max-width: 100%;
+			padding: 8px;
+			border-radius: 24px;
+			background: linear-gradient(180deg, rgba(255, 255, 255, 0.94), rgba(242, 248, 242, 0.9));
+			border: 1px solid rgba(23, 79, 35, 0.1);
+			box-shadow: 0 18px 36px rgba(25, 39, 27, 0.08);
+			backdrop-filter: blur(18px);
+		}
+
+		.mode-tab {
+			border: 0;
+			background: transparent;
+			color: var(--muted);
+			min-width: 188px;
+			padding: 14px 18px;
+			border-radius: 18px;
+			font-size: 13px;
+			font-weight: 800;
+			cursor: pointer;
+			transition: background 0.2s ease, color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
+			white-space: nowrap;
+			text-align: left;
+			display: grid;
+			gap: 4px;
+		}
+
+		.mode-tab-title {
+			display: flex;
+			align-items: center;
+			gap: 8px;
+			line-height: 1.1;
+		}
+
+		.mode-tab-dot {
+			width: 9px;
+			height: 9px;
+			border-radius: 50%;
+			background: rgba(27, 94, 32, 0.22);
+			box-shadow: inset 0 0 0 1px rgba(27, 94, 32, 0.08);
+			transition: background 0.2s ease, transform 0.2s ease;
+		}
+
+		.mode-tab-copy {
+			font-size: 11px;
+			font-weight: 700;
+			line-height: 1.35;
+			color: rgba(57, 79, 60, 0.74);
+		}
+
+		.mode-tab:hover {
+			color: var(--green);
+			background: rgba(27, 94, 32, 0.05);
+			transform: translateY(-1px);
+		}
+
+		.mode-tab.active {
+			background: linear-gradient(135deg, #1b5e20, #388e3c 58%, #56a869);
+			color: white;
+			box-shadow: 0 14px 26px rgba(23, 79, 35, 0.2);
+		}
+
+		.mode-tab.active .mode-tab-copy {
+			color: rgba(255, 255, 255, 0.82);
+		}
+
+		.mode-tab.active .mode-tab-dot {
+			background: white;
+			transform: scale(1.08);
+		}
+
+		.card {
+			background:
+				linear-gradient(180deg, rgba(255, 255, 255, 0.88), rgba(248, 252, 248, 0.8));
+			border: 1px solid rgba(255, 255, 255, 0.58);
+			backdrop-filter: blur(24px) saturate(180%);
+			box-shadow:
+				0 24px 70px rgba(19, 34, 24, 0.08),
+				inset 0 1px 0 rgba(255, 255, 255, 0.72);
+			border-radius: 32px;
+			padding: clamp(22px, 4vw, 36px);
+			position: relative;
+			overflow: hidden;
+			width: 100%;
+		}
+
+		.card::before {
+			content: "";
+			position: absolute;
+			inset: 0;
+			background: linear-gradient(135deg, rgba(98, 180, 109, 0.06), transparent 36%, rgba(197, 150, 12, 0.05));
+			pointer-events: none;
+		}
+
+		.drop-zone {
+			position: relative;
+			border: 1.5px solid rgba(23, 79, 35, 0.12);
+			border-radius: 26px;
+			background: linear-gradient(180deg, rgba(255, 255, 255, 0.9), rgba(244, 250, 244, 0.84));
+			transition: transform 0.25s ease, background 0.25s ease, border-color 0.25s ease, box-shadow 0.25s ease;
+			cursor: pointer;
+			outline: none;
+			box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.8);
+		}
+
+		.drop-zone:hover,
+		.drop-zone.drag-over {
+			background: linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(237, 247, 238, 0.9));
+			border-color: rgba(23, 79, 35, 0.22);
+			box-shadow: 0 16px 34px rgba(25, 44, 29, 0.07);
+		}
+
+		.drop-zone.drag-over {
+			transform: translateY(-1px) scale(1.005);
+			animation: zonePulse 1.5s ease-in-out infinite;
+		}
+
+		@keyframes zonePulse {
+			0%, 100% { box-shadow: 0 0 0 0 rgba(27, 94, 32, 0.18); }
+			50% { box-shadow: 0 0 0 12px rgba(27, 94, 32, 0); }
+		}
+
+		.drop-empty {
+			text-align: center;
+			padding: 56px 28px;
+		}
+
+		.drop-icon {
+			width: 86px;
+			height: 86px;
+			margin: 0 auto 18px;
+			display: grid;
+			place-items: center;
+			border-radius: 26px;
+			background: linear-gradient(135deg, rgba(222, 244, 224, 0.95), rgba(255, 250, 240, 0.9));
+			color: var(--green);
+			box-shadow: 0 20px 38px rgba(30, 48, 31, 0.08);
+		}
+
+		.drop-empty h3 {
+			font-size: 20px;
+			font-weight: 800;
+			letter-spacing: -0.02em;
+			margin-bottom: 8px;
+		}
+
+		.drop-empty p {
+			font-size: 14px;
+			line-height: 1.7;
+			color: var(--muted);
+			margin-bottom: 20px;
+		}
+
+		.type-list {
+			display: flex;
+			flex-wrap: wrap;
+			justify-content: center;
+			gap: 8px;
+		}
+
+		.type-chip {
+			display: inline-flex;
+			align-items: center;
+			gap: 4px;
+			padding: 7px 12px;
+			border-radius: 999px;
+			font-size: 12px;
+			font-weight: 700;
+			color: var(--green);
+			background: rgba(255, 255, 255, 0.82);
+			border: 1px solid rgba(23, 79, 35, 0.09);
+			box-shadow: 0 10px 20px rgba(23, 36, 24, 0.04);
+		}
+
+		.drop-file {
+			display: none;
+			align-items: center;
+			gap: 14px;
+			padding: 18px 18px;
+			width: 100%;
+		}
+
+		.thumb {
+			width: 64px;
+			height: 64px;
+			flex-shrink: 0;
+			border-radius: 18px;
+			background: linear-gradient(135deg, rgba(223, 244, 225, 0.9), rgba(255, 255, 255, 0.9));
+			border: 1px solid rgba(23, 79, 35, 0.08);
+			display: grid;
+			place-items: center;
+			overflow: hidden;
+			box-shadow: 0 14px 30px rgba(28, 42, 28, 0.07);
+		}
+
+		.thumb img {
+			width: 100%;
+			height: 100%;
+			object-fit: cover;
+			display: block;
+		}
+
+		.file-meta {
+			flex: 1;
+			min-width: 0;
+		}
+
+		.selection-header {
+			display: flex;
+			align-items: center;
+			justify-content: space-between;
+			flex-wrap: wrap;
+			gap: 12px;
+			margin-bottom: 10px;
+		}
+
+		.selection-header .section-label {
+			margin-bottom: 0;
+		}
+
+		.add-files-btn {
+			display: none;
+			align-items: center;
+			gap: 6px;
+			border: 1px solid rgba(23, 79, 35, 0.12);
+			background: rgba(255, 255, 255, 0.82);
+			color: var(--green);
+			border-radius: 999px;
+			padding: 8px 12px;
+			font-size: 11px;
+			font-weight: 800;
+			cursor: pointer;
+			box-shadow: 0 10px 20px rgba(23, 36, 24, 0.04);
+		}
+
+		.add-files-btn.visible {
+			display: inline-flex;
+		}
+
+		.add-files-btn:hover {
+			background: rgba(255, 255, 255, 0.96);
+		}
+
+		.file-name {
+			font-size: 15px;
+			font-weight: 700;
+			color: var(--text);
+			white-space: nowrap;
+			overflow: hidden;
+			text-overflow: ellipsis;
+		}
+
+		.file-row {
+			display: flex;
+			align-items: center;
+			gap: 8px;
+			margin-top: 4px;
+		}
+
+		.badge {
+			display: inline-flex;
+			align-items: center;
+			padding: 4px 8px;
+			border-radius: 999px;
+			font-size: 11px;
+			font-weight: 800;
+			color: white;
+		}
+
+		.badge-jpg { background: linear-gradient(135deg, #1B5E20, #2E7D32); }
+		.badge-png { background: linear-gradient(135deg, #C5960C, #9E7A0A); }
+		.badge-pdf { background: linear-gradient(135deg, #D32F2F, #B71C1C); }
+		.badge-txt { background: linear-gradient(135deg, #1565C0, #1976D2); }
+
+		.file-size {
+			font-size: 12px;
+			color: var(--muted);
+		}
+
+		.remove-btn {
+			width: 40px;
+			height: 40px;
+			border: 0;
+			border-radius: 14px;
+			background: rgba(255, 255, 255, 0.76);
+			color: #E57373;
+			cursor: pointer;
+			flex-shrink: 0;
+			box-shadow: 0 10px 22px rgba(40, 28, 28, 0.06);
+			transition: background 0.2s ease, transform 0.2s ease;
+		}
+
+		.remove-btn:hover {
+			background: rgba(255, 255, 255, 0.92);
+			transform: translateY(-1px);
+		}
+
+		.section {
+			display: none;
+			margin-top: 26px;
+			animation: slideUp 0.3s ease-out forwards;
+		}
+
+		.section.visible { display: block; }
+
+		@keyframes slideUp {
+			from { opacity: 0; transform: translateY(10px); }
+			to { opacity: 1; transform: translateY(0); }
+		}
+
+		.section-label {
+			font-size: 12px;
+			letter-spacing: 0.08em;
+			text-transform: uppercase;
+			font-weight: 800;
+			color: var(--text);
+			margin-bottom: 14px;
+		}
+
+		.slider-track {
+			position: relative;
+			height: 8px;
+			border-radius: 999px;
+			background: rgba(23, 79, 35, 0.08);
+			margin-bottom: 14px;
+		}
+
+		.slider-fill {
+			position: absolute;
+			top: 0;
+			left: 0;
+			height: 100%;
+			border-radius: 999px;
+			background: linear-gradient(90deg, #1b5e20, #54b968 65%, #d0a330);
+			transition: width 0.25s ease;
+		}
+
+		.slider-thumb {
+			position: absolute;
+			top: 50%;
+			width: 20px;
+			height: 20px;
+			border-radius: 50%;
+			background: linear-gradient(180deg, #ffffff, #f6fbf6);
+			border: 2px solid var(--green);
+			transform: translateY(-50%);
+			box-shadow: 0 10px 20px rgba(24, 39, 26, 0.12);
+			transition: left 0.25s ease;
+		}
+
+		.level-buttons {
+			display: flex;
+			justify-content: space-between;
+			gap: 10px;
+		}
+
+		.level-btn {
+			flex: 1;
+			border: 0;
+			background: rgba(255, 255, 255, 0.6);
+			border-radius: 18px;
+			padding: 13px 10px;
+			display: flex;
+			flex-direction: column;
+			align-items: center;
+			gap: 4px;
+			cursor: pointer;
+			border: 1px solid rgba(23, 79, 35, 0.06);
+			box-shadow: 0 12px 28px rgba(25, 39, 27, 0.04);
+			transition: transform 0.18s ease, background 0.18s ease, border-color 0.18s ease;
+		}
+
+		.level-btn:hover {
+			background: rgba(255, 255, 255, 0.86);
+			border-color: rgba(23, 79, 35, 0.12);
+		}
+
+		.level-btn.active {
+			background: linear-gradient(180deg, rgba(223, 244, 225, 0.94), rgba(255, 255, 255, 0.92));
+			transform: translateY(-2px);
+			border-color: rgba(23, 79, 35, 0.16);
+		}
+
+		.level-btn span:last-child {
+			font-size: 11px;
+			font-weight: 800;
+			color: var(--muted);
+		}
+
+		.level-btn.active span:last-child { color: var(--green); }
+
+		.level-desc {
+			margin-top: 14px;
+			font-size: 12px;
+			color: var(--muted);
+			text-align: center;
+			line-height: 1.7;
+		}
+
+		.primary-btn,
+		.secondary-btn,
+		.retry-btn {
+			width: 100%;
+			height: 52px;
+			border-radius: 16px;
+			font-size: 14px;
+			font-weight: 800;
+			cursor: pointer;
+			transition: box-shadow 0.2s ease, background 0.2s ease, opacity 0.2s ease;
+		}
+
+		.primary-btn {
+			margin-top: 18px;
+			border: 0;
+			color: white;
+			background: linear-gradient(135deg, #1b5e20, #388e3c 58%, #56a869);
+			box-shadow: 0 18px 32px rgba(23, 79, 35, 0.22);
+		}
+
+		.primary-btn:hover:not(:disabled) {
+			box-shadow: 0 22px 40px rgba(23, 79, 35, 0.28);
+		}
+
+		.primary-btn:disabled {
+			opacity: 0.48;
+			cursor: not-allowed;
+		}
+
+		.progress-card {
+			display: flex;
+			align-items: center;
+			gap: 12px;
+			padding: 14px;
+			border-radius: 18px;
+			background: rgba(255, 255, 255, 0.72);
+			border: 1px solid rgba(23, 79, 35, 0.08);
+			margin-bottom: 16px;
+			box-shadow: 0 14px 28px rgba(20, 38, 22, 0.05);
+		}
+
+		.progress-icon {
+			width: 46px;
+			height: 46px;
+			border-radius: 14px;
+			background: linear-gradient(135deg, rgba(223, 244, 225, 0.92), rgba(255, 255, 255, 0.96));
+			display: grid;
+			place-items: center;
+			flex-shrink: 0;
+		}
+
+		.progress-name {
+			font-size: 13px;
+			font-weight: 700;
+			color: var(--text);
+			margin-bottom: 2px;
+		}
+
+		.progress-meta {
+			font-size: 11px;
+			color: var(--muted);
+		}
+
+		.progress-row {
+			display: flex;
+			justify-content: space-between;
+			gap: 12px;
+			align-items: center;
+			margin-bottom: 8px;
+		}
+
+		.progress-stage {
+			font-size: 13px;
+			font-weight: 700;
+			color: var(--text);
+		}
+
+		.progress-pct {
+			font-size: 13px;
+			font-weight: 900;
+			color: var(--green);
+		}
+
+		.progress-track {
+			height: 14px;
+			border-radius: 999px;
+			background: rgba(23, 79, 35, 0.08);
+			overflow: hidden;
+		}
+
+		.progress-fill {
+			position: relative;
+			width: 0%;
+			height: 100%;
+			border-radius: 999px;
+			background: linear-gradient(90deg, #1B5E20, #4CAF50);
+			transition: width 0.3s ease;
+			overflow: hidden;
+		}
+
+		.progress-fill::after {
+			content: "";
+			position: absolute;
+			top: 0;
+			left: -100%;
+			width: 100%;
+			height: 100%;
+			background: linear-gradient(90deg, transparent, rgba(255,255,255,0.35), transparent);
+			animation: shimmer 1.8s ease-in-out infinite;
+		}
+
+		@keyframes shimmer {
+			0% { left: -100%; }
+			100% { left: 100%; }
+		}
+
+		.progress-note {
+			margin-top: 10px;
+			display: flex;
+			align-items: center;
+			gap: 7px;
+			font-size: 12px;
+			color: var(--muted);
+		}
+
+		.spinner {
+			width: 14px;
+			height: 14px;
+			border-radius: 50%;
+			border: 2px solid rgba(27, 94, 32, 0.18);
+			border-top-color: var(--green);
+			animation: spin 0.8s linear infinite;
+		}
+
+		@keyframes spin { to { transform: rotate(360deg); } }
+
+		.result-icon {
+			width: 70px;
+			height: 70px;
+			margin: 0 auto 12px;
+			border-radius: 50%;
+			display: grid;
+			place-items: center;
+			background: linear-gradient(135deg, rgba(223, 244, 225, 0.98), rgba(255, 250, 240, 0.94));
+			color: var(--green);
+			animation: popIn 0.45s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+			box-shadow: 0 20px 40px rgba(25, 41, 28, 0.08);
+		}
+
+		@keyframes popIn {
+			0% { opacity: 0; transform: scale(0); }
+			60% { transform: scale(1.15); }
+			100% { opacity: 1; transform: scale(1); }
+		}
+
+		.result-title {
+			text-align: center;
+			font-size: 20px;
+			font-weight: 900;
+			color: var(--green);
+			margin-bottom: 8px;
+		}
+
+		.result-note {
+			min-height: 16px;
+			text-align: center;
+			font-size: 12px;
+			color: var(--gold);
+			margin-bottom: 12px;
+			line-height: 1.5;
+		}
+
+		.codec-badge {
+			display: none;
+		}
+
+		.stat-grid {
+			display: grid;
+			grid-template-columns: 1fr 1fr;
+			gap: 12px;
+			margin-bottom: 16px;
+		}
+
+		.stat-card {
+			padding: 18px;
+			border-radius: 18px;
+			box-shadow: 0 12px 26px rgba(25, 39, 27, 0.05);
+		}
+
+		.stat-card.before {
+			background: rgba(239, 83, 80, 0.06);
+			border: 1px solid rgba(239, 83, 80, 0.14);
+		}
+
+		.stat-card.after {
+			background: rgba(27, 94, 32, 0.06);
+			border: 1px solid rgba(27, 94, 32, 0.14);
+		}
+
+		.stat-label {
+			font-size: 11px;
+			font-weight: 700;
+			margin-bottom: 4px;
+		}
+
+		.stat-card.before .stat-label { color: #EF5350; }
+		.stat-card.after .stat-label { color: var(--green); }
+
+		.stat-size {
+			font-size: 20px;
+			font-weight: 900;
+			color: var(--text);
+		}
+
+		.saving-box {
+			padding: 18px;
+			border-radius: 18px;
+			background: rgba(255, 255, 255, 0.72);
+			border: 1px solid rgba(23, 79, 35, 0.08);
+			margin-bottom: 16px;
+			box-shadow: 0 12px 26px rgba(25, 39, 27, 0.05);
+		}
+
+		.saving-row {
+			display: flex;
+			justify-content: space-between;
+			align-items: center;
+			margin-bottom: 10px;
+		}
+
+		.saving-row span:first-child {
+			font-size: 13px;
+			font-weight: 700;
+			color: var(--text);
+		}
+
+		.saving-row span:last-child {
+			font-size: 18px;
+			font-weight: 900;
+			color: var(--green);
+		}
+
+		.bar-shell {
+			height: 8px;
+			border-radius: 999px;
+			overflow: hidden;
+			margin-bottom: 5px;
+		}
+
+		.bar-shell.before { background: rgba(239, 83, 80, 0.12); }
+		.bar-shell.after { background: rgba(27, 94, 32, 0.1); }
+
+		.bar-fill-fixed,
+		.bar-fill-dynamic {
+			height: 100%;
+			border-radius: 999px;
+		}
+
+		.bar-fill-fixed {
+			width: 100%;
+			background: linear-gradient(90deg, #EF5350, #E57373);
+		}
+
+		.bar-fill-dynamic {
+			width: 5%;
+			background: linear-gradient(90deg, #1B5E20, #4CAF50);
+			transition: width 0.9s ease;
+		}
+
+		.action-row {
+			display: flex;
+			gap: 12px;
+			flex-wrap: wrap;
+			align-items: stretch;
+		}
+
+		.action-row > button {
+			flex: 1 1 220px;
+			min-width: 0;
+			margin-top: 0;
+		}
+
+		#compress-btn {
+			margin-top: 18px;
+		}
+
+		#file-list,
+		#results-list {
+			display: grid;
+			gap: 12px;
+		}
+
+		.file-list-item,
+		.result-item {
+			display: flex;
+			align-items: center;
+			justify-content: space-between;
+			gap: 12px;
+			padding: 14px 16px;
+			border-radius: 18px;
+			background: rgba(255, 255, 255, 0.78);
+			border: 1px solid rgba(23, 79, 35, 0.08);
+			box-shadow: 0 10px 22px rgba(25, 39, 27, 0.04);
+			min-width: 0;
+			overflow: hidden;
+		}
+
+		.file-list-item-main,
+		.result-item-main {
+			min-width: 0;
+			flex: 1;
+		}
+
+		.file-list-item-name,
+		.result-item-name {
+			font-size: 14px;
+			font-weight: 700;
+			color: var(--text);
+			min-width: 0;
+			white-space: nowrap;
+			overflow: hidden;
+			text-overflow: ellipsis;
+		}
+
+		.file-list-item-meta,
+		.result-item-meta {
+			margin-top: 5px;
+			display: flex;
+			align-items: center;
+			gap: 8px;
+			flex-wrap: wrap;
+			font-size: 11px;
+			color: var(--muted);
+		}
+
+		.result-item {
+			align-items: flex-start;
+		}
+
+		.result-item.error {
+			border-color: rgba(211, 47, 47, 0.18);
+			background: rgba(211, 47, 47, 0.05);
+		}
+
+		.result-item-actions {
+			display: flex;
+			align-items: center;
+			gap: 10px;
+			flex-shrink: 0;
+		}
+
+		.download-small-btn {
+			border: 0;
+			border-radius: 14px;
+			padding: 11px 16px;
+			font-size: 12px;
+			font-weight: 800;
+			color: white;
+			cursor: pointer;
+			background: linear-gradient(135deg, #1b5e20, #388e3c 58%, #56a869);
+			box-shadow: 0 14px 26px rgba(23, 79, 35, 0.18);
+			white-space: nowrap;
+		}
+
+		.download-small-btn:hover {
+			box-shadow: 0 18px 30px rgba(23, 79, 35, 0.24);
+		}
+
+		.secondary-btn {
+			border: 1px solid rgba(23, 79, 35, 0.14);
+			color: var(--green);
+			background: rgba(255, 255, 255, 0.7);
+			box-shadow: 0 14px 28px rgba(25, 39, 27, 0.04);
+		}
+
+		.secondary-btn:hover { background: rgba(255, 255, 255, 0.92); }
+
+		.error-box {
+			padding: 18px;
+			border-radius: 18px;
+			background: rgba(211, 47, 47, 0.05);
+			border: 1px solid rgba(211, 47, 47, 0.18);
+			display: flex;
+			align-items: flex-start;
+			gap: 10px;
+		}
+
+		.error-box strong {
+			color: var(--red);
+			margin-bottom: 4px;
+		}
+
+		.error-box p {
+			line-height: 1.5;
+			color: rgba(211, 47, 47, 0.8);
+		}
+
+		.retry-btn {
+			border: 0;
+			margin-top: 14px;
+			color: white;
+			background: linear-gradient(135deg, #1b5e20, #2f7a3f);
+		}
+
+		@media (max-width: 960px) {
+			.header-inner,
+			.info-inner,
+			.footer-inner {
+				padding-left: 18px;
+				padding-right: 18px;
+			}
+
+			main {
+				max-width: 760px;
+				padding: 34px 18px 28px;
+			}
+
+			.card {
+				border-radius: 28px;
+				padding: 22px;
+			}
+
+			.title h2 {
+				max-width: 100%;
+				font-size: clamp(22px, 3.8vw, 32px);
+				white-space: nowrap;
+			}
+
+			.title p {
+				max-width: 480px;
+			}
+
+			.mode-switch {
+				width: 100%;
+				justify-items: stretch;
+			}
+
+			.mode-tabs {
+				width: 100%;
+				max-width: 640px;
+				display: grid;
+				grid-template-columns: repeat(2, minmax(0, 1fr));
+				align-items: stretch;
+			}
+
+			.mode-tab {
+				min-width: 0;
+				padding: 13px 16px;
+			}
+
+			.selection-header {
+				align-items: flex-start;
+			}
+		}
+
+		@media (max-width: 640px) {
+			.header-inner {
+				min-height: 80px;
+				padding-top: 10px;
+				padding-bottom: 10px;
+				justify-content: center;
+			}
+
+			.brand {
+				width: 100%;
+				justify-content: center;
+			}
+
+			.brand img {
+				height: 58px;
+				max-width: min(72vw, 280px);
+			}
+
+			.header-actions {
+				position: absolute;
+				right: 14px;
+				top: 50%;
+				transform: translateY(-50%);
+			}
+
+			main {
+				padding: 18px 12px 18px;
+			}
+
+			.title {
+				align-items: center;
+				text-align: center;
+				gap: 8px;
+				margin-bottom: 18px;
+			}
+
+			.title h2 {
+				max-width: 100%;
+				font-size: clamp(22px, 7vw, 27px);
+				line-height: 1.08;
+				white-space: normal;
+				text-wrap: balance;
+			}
+
+			.title p {
+				max-width: 100%;
+				font-size: 12px;
+				line-height: 1.5;
+			}
+
+			.mode-switch {
+				gap: 6px;
+				margin-bottom: 16px;
+			}
+
+			.mode-switch-label {
+				text-align: left;
+				font-size: 10px;
+			}
+
+			.mode-tabs {
+				grid-template-columns: repeat(2, minmax(0, 1fr));
+				padding: 5px;
+				border-radius: 18px;
+				gap: 5px;
+				box-shadow: 0 12px 24px rgba(25, 39, 27, 0.06);
+			}
+
+			.mode-tab {
+				padding: 11px 10px;
+				border-radius: 14px;
+				text-align: center;
+				gap: 0;
+			}
+
+			.mode-tab-title {
+				justify-content: center;
+			}
+
+			.mode-tab-copy {
+				display: none;
+			}
+
+			.card {
+				border-radius: 20px;
+				padding: 14px;
+				box-shadow: 0 16px 34px rgba(19, 34, 24, 0.07), inset 0 1px 0 rgba(255, 255, 255, 0.72);
+			}
+
+			.drop-zone {
+				border-radius: 22px;
+			}
+
+			.drop-empty {
+				padding: 28px 14px;
+			}
+
+			.drop-icon {
+				width: 70px;
+				height: 70px;
+				margin-bottom: 14px;
+				border-radius: 22px;
+			}
+
+			.drop-empty h3 {
+				font-size: 18px;
+			}
+
+			.drop-empty p {
+				font-size: 13px;
+				margin-bottom: 16px;
+			}
+
+			.drop-file {
+				padding: 12px;
+				flex-direction: column;
+				align-items: stretch;
+				gap: 10px;
+			}
+
+			.file-meta {
+				width: 100%;
+			}
+
+			.selection-header {
+				flex-direction: column;
+				align-items: stretch;
+				gap: 8px;
+			}
+
+			.add-files-btn {
+				justify-content: center;
+				width: 100%;
+				padding-top: 10px;
+				padding-bottom: 10px;
+			}
+
+			.file-list-item,
+			.result-item {
+				padding: 11px 11px;
+				border-radius: 14px;
+			}
+
+			.file-list-item {
+				align-items: flex-start;
+			}
+
+			.file-list-item-name,
+			.result-item-name {
+				white-space: normal;
+				display: -webkit-box;
+				line-clamp: 2;
+				-webkit-box-orient: vertical;
+				-webkit-line-clamp: 2;
+				line-height: 1.3;
+			}
+
+			.result-item {
+				flex-direction: column;
+				align-items: stretch;
+			}
+
+			.result-item-actions {
+				justify-content: flex-start;
+			}
+
+			.action-row {
+				flex-direction: column;
+				gap: 10px;
+			}
+
+			.action-row > button,
+			.primary-btn,
+			.secondary-btn,
+			.retry-btn {
+				height: 44px;
+				border-radius: 14px;
+				font-size: 13px;
+			}
+
+			.download-small-btn {
+				width: 100%;
+				padding-top: 10px;
+				padding-bottom: 10px;
+			}
+
+			.remove-btn {
+				align-self: flex-end;
+				width: 36px;
+				height: 36px;
+			}
+
+			.footer-inner {
+				padding-top: 8px;
+				padding-bottom: 10px;
+				gap: 8px;
+			}
+
+			.info-inner {
+				padding-right: 16px;
+			}
+		}
+
+		.feature-grid {
+			display: none;
+		}
+
+		.feature {
+			text-align: center;
+			padding: 18px 14px;
+			border-radius: 20px;
+			background: rgba(255, 255, 255, 0.72);
+			border: 1px solid rgba(23, 79, 35, 0.08);
+			backdrop-filter: blur(12px);
+			box-shadow: 0 14px 32px rgba(25, 39, 27, 0.05);
+		}
+
+		.feature svg {
+			color: var(--green);
+			margin-bottom: 10px;
+		}
+
+		.feature strong {
+			display: block;
+			font-size: 12px;
+			font-weight: 900;
+			color: var(--text);
+			margin-bottom: 5px;
+		}
+
+		.feature span {
+			font-size: 11px;
+			line-height: 1.6;
+			color: var(--muted);
+		}
+
+		footer {
+			position: relative;
+			z-index: 1;
+			background: rgba(255, 255, 255, 0.38);
+			border-top: 1px solid rgba(23, 79, 35, 0.06);
+			backdrop-filter: blur(14px);
+		}
+
+		.footer-inner {
+			min-height: 64px;
+			display: flex;
+			align-items: center;
+			justify-content: center;
+			flex-wrap: wrap;
+			gap: 10px;
+		}
+
+		footer p,
+		.footer-local span:last-child {
+			font-size: 11px;
+			color: var(--muted);
+		}
+
+		.footer-local {
+			display: flex;
+			align-items: center;
+			gap: 6px;
+			padding: 8px 12px;
+			border-radius: 999px;
+			background: rgba(255, 255, 255, 0.62);
+			border: 1px solid rgba(23, 79, 35, 0.08);
+		}
+
+		.footer-dot {
+			width: 6px;
+			height: 6px;
+			border-radius: 50%;
+			background: var(--green);
+		}
+
+		svg {
+			fill: none;
+			stroke: currentColor;
+			stroke-width: 2;
+			stroke-linecap: round;
+			stroke-linejoin: round;
+		}
+	</style>
+</head>
+<body>
+	<div class="page">
+		<div class="particles" id="particles" aria-hidden="true"></div>
+
+		<header>
+			<div class="header-inner">
+				<div class="brand">
+					<img src="https://files.catbox.moe/nse05j.png" alt="University of Sharjah logo" />
+				</div>
+
+				<div class="header-actions">
+					<div class="engine-badge" title="Compression engine status">
+						<span class="engine-dot loading" id="engine-dot"></span>
+						<span id="engine-label">Loading codecs…</span>
+					</div>
+					<button class="icon-btn" id="info-btn" aria-label="Information" aria-expanded="false">
+						<svg viewBox="0 0 24 24" width="18" height="18"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
+					</button>
+				</div>
+			</div>
+		</header>
+
+		<div id="info-banner">
+			<div class="info-inner">
+				<div style="color: var(--green); margin-top: 2px; flex-shrink: 0;">
+					<svg viewBox="0 0 24 24" width="20" height="20"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
+				</div>
+				<div class="info-copy">
+					<h3>Private Browser Processing</h3>
+					<p>Your files are processed only inside this browser session. Nothing is uploaded, stored, or retained after you leave.</p>
+				</div>
+				<button class="icon-btn" id="info-close" aria-label="Close information">
+					<svg viewBox="0 0 24 24" width="16" height="16"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+				</button>
+			</div>
+		</div>
+
+		<main>
+			<section class="title">
+				<h2 id="page-title">Compress PDFs and images.</h2>
+				<p id="page-subtitle">Select one or more files and save each result individually.</p>
+			</section>
+
+			<div class="mode-switch">
+				<div class="mode-switch-label">Choose Tool</div>
+				<div class="mode-tabs" role="tablist" aria-label="Tool mode">
+					<button class="mode-tab active" id="compress-tab" data-mode="compress" role="tab" aria-selected="true">
+						<span class="mode-tab-title"><span class="mode-tab-dot"></span><span>Compress</span></span>
+						<span class="mode-tab-copy">Reduce file size for separate downloads</span>
+					</button>
+					<button class="mode-tab" id="merge-tab" data-mode="merge" role="tab" aria-selected="false">
+						<span class="mode-tab-title"><span class="mode-tab-dot"></span><span>Merge</span></span>
+						<span class="mode-tab-copy">Combine PDFs and images into one PDF</span>
+					</button>
+				</div>
+			</div>
+
+			<section class="card">
+				<div class="drop-zone" id="drop-zone" tabindex="0" role="button" aria-label="Upload file">
+					<div class="drop-empty" id="drop-empty">
+						<div class="drop-icon">
+							<svg viewBox="0 0 24 24" width="34" height="34"><polyline points="16 16 12 12 8 16"></polyline><line x1="12" y1="12" x2="12" y2="21"></line><path d="M20.39 18.39A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3"></path></svg>
+						</div>
+						<h3 id="drop-title">Drag &amp; drop PDFs or images</h3>
+						<p id="drop-subtitle">or click to browse</p>
+						<div class="type-list">
+							<span class="type-chip">JPEG</span>
+							<span class="type-chip">PNG</span>
+							<span class="type-chip">PDF</span>
+						</div>
+					</div>
+
+					<div class="drop-file" id="drop-file">
+						<div class="file-meta" style="width: 100%;">
+							<div class="selection-header">
+								<div class="section-label" id="selection-label">Selected Files</div>
+								<button class="add-files-btn" id="add-files-btn" type="button">
+									<svg viewBox="0 0 24 24" width="14" height="14"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+									<span>Add Files</span>
+								</button>
+							</div>
+							<div id="file-list"></div>
+						</div>
+						<button class="remove-btn" id="remove-file" aria-label="Clear files">
+							<svg viewBox="0 0 24 24" width="16" height="16"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"></path></svg>
+						</button>
+					</div>
+				</div>
+
+					<input id="file-input" type="file" accept=".jpg,.jpeg,.png,.webp,.avif,.gif,.bmp,.tif,.tiff,.heic,.heif,.pdf,.html,.htm,.txt,.json,.css,.js,.xml,.csv,.md,.svg" multiple hidden />
+
+				<div class="section" id="action-section">
+					<button class="primary-btn" id="compress-btn" disabled>Preparing…</button>
+				</div>
+
+				<div class="section" id="progress-section">
+					<div class="progress-card">
+						<div class="progress-icon" id="progress-icon"></div>
+						<div>
+							<div class="progress-name" id="progress-name"></div>
+							<div class="progress-meta" id="progress-meta"></div>
+						</div>
+					</div>
+
+					<div class="progress-row">
+						<span class="progress-stage" id="progress-stage">Starting…</span>
+						<span class="progress-pct" id="progress-pct">0%</span>
+					</div>
+
+					<div class="progress-track">
+						<div class="progress-fill" id="progress-fill"></div>
+					</div>
+
+					<div class="progress-note">
+						<span class="spinner"></span>
+						<span>Processing locally. Nothing is uploaded.</span>
+					</div>
+				</div>
+
+				<div class="section" id="result-section">
+					<div class="result-icon">
+						<svg viewBox="0 0 24 24" width="34" height="34"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
+					</div>
+					<div class="result-title" id="result-title">Compression Complete</div>
+					<div class="result-note" id="result-note"></div>
+
+					<div id="results-list" style="margin-bottom: 16px;"></div>
+
+					<div class="action-row">
+						<button class="secondary-btn" id="reset-btn">Clear Selection</button>
+					</div>
+				</div>
+
+				<div class="section" id="error-section">
+					<div class="error-box">
+						<div style="color: var(--red); margin-top: 2px; flex-shrink: 0;">
+							<svg viewBox="0 0 24 24" width="20" height="20"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
+						</div>
+						<div>
+							<strong>Compression Failed</strong>
+							<p id="error-message">An unexpected error occurred.</p>
+						</div>
+					</div>
+					<button class="retry-btn" id="retry-btn">Try Again</button>
+				</div>
+			</section>
+
+			<section class="feature-grid">
+				<div class="feature">
+					<svg viewBox="0 0 24 24" width="20" height="20"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
+					<strong>100% Private</strong>
+					<span>Everything stays on this device</span>
+				</div>
+				<div class="feature">
+					<svg viewBox="0 0 24 24" width="20" height="20"><path d="M3 12h18"></path><path d="M12 3v18"></path><circle cx="12" cy="12" r="9"></circle></svg>
+					<strong>Fast Workflow</strong>
+					<span>Smooth upload, compress, and download flow</span>
+				</div>
+				<div class="feature">
+					<svg viewBox="0 0 24 24" width="20" height="20"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
+					<strong>Target Range</strong>
+					<span>Designed around 300 KB to 1 MB</span>
+				</div>
+			</section>
+		</main>
+
+		<footer>
+			<div class="footer-inner">
+				<p>University of Sharjah - Office of the Registrar</p>
+				<div class="footer-local">
+					<span class="footer-dot"></span>
+					<span>All processing happens locally in your browser</span>
+				</div>
+				<p style="font-size: 10px; opacity: 0.82;">Powered by Ahmad Albalbissi</p>
+			</div>
+		</footer>
+	</div>
+
+	<script type="module">
+		const TARGET_MAX = 972_800;
+		const TARGET_MIN = 307_200;
+		const AUTO_LEVEL = "low";
+		const MIN_JPEG_QUALITY = 0.62;
+		const MAX_JPEG_QUALITY = 0.94;
+		const MIN_MEANINGFUL_SAVINGS_RATIO = 0.005;
+		const TARGET_FILL_RATIO = 0.985;
+		const MAX_INPUT_BYTES = 100 * 1024 * 1024;
+		const IMAGE_EXTENSIONS = new Set(["jpg", "jpeg", "png", "webp", "avif", "gif", "bmp", "heic", "heif", "tif", "tiff"]);
+		const TEXT_EXTENSIONS = new Set(["html", "htm", "txt", "json", "css", "js", "xml", "csv", "md", "svg"]);
+
+		const LEVELS = {
+			low: {
+				aim: 910_000,
+				maxDimension: 3000,
+				startQuality: 0.88,
+				pdfDpi: 150,
+				pdfQuality: 0.85,
+				description: "",
+			},
+			recommended: {
+				aim: 650_000,
+				maxDimension: 2000,
+				startQuality: 0.8,
+				pdfDpi: 120,
+				pdfQuality: 0.75,
+				description: "",
+			},
+			high: {
+				aim: 400_000,
+				maxDimension: 1400,
+				startQuality: 0.72,
+				pdfDpi: 96,
+				pdfQuality: 0.68,
+				description: "",
+			},
+		};
+
+		const MODE_CONFIG = {
+			compress: {
+				title: "Compress PDFs, images, and text files.",
+				subtitle: "Select one or more files and save each result individually.",
+				dropTitle: "Drag & drop PDFs, images, or text files",
+				dropSubtitle: "or click to browse",
+				selectionLabel: "Selected Files",
+				actionSingle: "Compress File",
+				actionMany: "Compress Files",
+				resultTitle: "Compression Complete",
+				resultNote: "Processed locally. Save each file individually.",
+				minFiles: 1,
+			},
+			merge: {
+				title: "Merge PDFs and images into one PDF.",
+				subtitle: "Choose multiple PDFs or images, merge them into one document.",
+				dropTitle: "Drag & drop files to merge",
+				dropSubtitle: "Choose PDFs or images to combine into one PDF",
+				selectionLabel: "Files To Merge",
+				actionSingle: "Select 2+ Files",
+				actionMany: "Merge Into One PDF",
+				resultTitle: "Merge Complete",
+				resultNote: "Merged and processed locally. Save the final PDF.",
+				minFiles: 2,
+			},
+		};
+
+		const state = {
+			files: [],
+			results: [],
+			mode: "compress",
+			appendSelection: false,
+			codecs: {
+				jpeg: null,
+				oxipng: null,
+				label: "Canvas Fallback",
+			},
+			capabilities: {
+				webpEncode: false,
+			},
+			engineReady: false,
+		};
+
+		const $ = (id) => document.getElementById(id);
+
+		const badgeLabel = (type, fileName = "") => {
+			if (type === "application/pdf") return "PDF";
+			if (type === "image/png") return "PNG";
+			if (type === "image/webp") return "WEBP";
+			if (type === "image/avif") return "AVIF";
+			if (type === "image/gif") return "GIF";
+			if (type === "image/bmp") return "BMP";
+			const ext = fileName.split(".").pop()?.toLowerCase();
+			if (ext === "html" || ext === "htm") return "HTML";
+			if (ext === "css") return "CSS";
+			if (ext === "js") return "JS";
+			if (ext === "json") return "JSON";
+			if (ext === "xml") return "XML";
+			if (ext === "csv") return "CSV";
+			if (ext === "txt") return "TXT";
+			if (ext === "md") return "MD";
+			if (ext === "heic" || ext === "heif") return ext.toUpperCase();
+			if (ext === "tif" || ext === "tiff") return "TIFF";
+			return "IMAGE";
+		};
+		const badgeClass = (type, fileName = "") => {
+			type = type || "";
+			const ext = getFileExtension(fileName);
+			if (type === "application/pdf") return "badge-pdf";
+			if (type === "image/png") return "badge-png";
+			if (TEXT_EXTENSIONS.has(ext) || type.startsWith("text/") || type === "application/json" || type === "application/xml") return "badge-txt";
+			return "badge-jpg";
+		};
+
+		function getFileExtension(fileName = "") {
+			return fileName.includes(".") ? fileName.split(".").pop().toLowerCase() : "";
+		}
+
+		function isImageFile(file) {
+			if (file.type?.startsWith("image/") && file.type !== "image/svg+xml") {
+				return true;
+			}
+			return IMAGE_EXTENSIONS.has(getFileExtension(file.name));
+		}
+
+		function isPdfFile(file) {
+			return file.type === "application/pdf" || getFileExtension(file.name) === "pdf";
+		}
+
+		function isTextFile(file) {
+			const ext = getFileExtension(file.name);
+			const type = file.type || "";
+			return TEXT_EXTENSIONS.has(ext)
+				|| type.startsWith("text/")
+				|| type === "application/json"
+				|| type === "application/xml"
+				|| type === "image/svg+xml";
+		}
+
+		function isSupportedFile(file) {
+			return isPdfFile(file) || isImageFile(file) || isTextFile(file);
+		}
+
+		function hasMeaningfulSavings(originalSize, compressedSize) {
+			if (!originalSize || compressedSize >= originalSize) return false;
+			return ((originalSize - compressedSize) / originalSize) >= MIN_MEANINGFUL_SAVINGS_RATIO;
+		}
+
+		function getEffectiveCap(originalSize) {
+			if (!originalSize || originalSize > TARGET_MAX) return TARGET_MAX;
+			return Math.max(1, originalSize - 1);
+		}
+
+		function isNearCap(size, cap) {
+			return size >= Math.round(cap * TARGET_FILL_RATIO);
+		}
+
+		async function detectInternalFileProfile(file) {
+			const profile = {
+				extension: getFileExtension(file.name),
+				mime: file.type || "",
+				isTextLike: false,
+				isLikelyMarkup: false,
+			};
+
+			if (isTextFile(file)) {
+				profile.isTextLike = true;
+				try {
+					const chunk = await file.slice(0, 4096).text();
+					profile.isLikelyMarkup = /<html|<body|<div|<head|<!doctype/i.test(chunk);
+				} catch (error) {
+				}
+			}
+
+			return profile;
+		}
+
+		function formatBytes(bytes) {
+			if (!bytes) return "0 B";
+			const units = ["B", "KB", "MB", "GB"];
+			const idx = Math.floor(Math.log(bytes) / Math.log(1024));
+			return `${(bytes / 1024 ** idx).toFixed(idx > 0 ? 1 : 0)} ${units[idx]}`;
+		}
+
+		function setEngineStatus(kind, text) {
+			const dot = $("engine-dot");
+			dot.className = `engine-dot ${kind}`;
+			$("engine-label").textContent = text;
+		}
+
+		function hideSections() {
+			["action-section", "progress-section", "result-section", "error-section"].forEach((id) => {
+				$(id).classList.remove("visible");
+			});
+		}
+
+		function updateModeUI() {
+			const config = MODE_CONFIG[state.mode];
+			$("page-title").textContent = config.title;
+			$("page-subtitle").textContent = config.subtitle;
+			$("drop-title").textContent = config.dropTitle;
+			$("drop-subtitle").textContent = config.dropSubtitle;
+			$("selection-label").textContent = config.selectionLabel;
+			$("result-title").textContent = config.resultTitle;
+			$("drop-zone").setAttribute("aria-label", state.mode === "merge" ? "Upload files to merge" : "Upload files to compress");
+			$("add-files-btn").classList.toggle("visible", state.mode === "merge");
+
+			document.querySelectorAll(".mode-tab").forEach((button) => {
+				const active = button.dataset.mode === state.mode;
+				button.classList.toggle("active", active);
+				button.setAttribute("aria-selected", String(active));
+			});
+		}
+
+		function updateCompressButton() {
+			const btn = $("compress-btn");
+			const config = MODE_CONFIG[state.mode];
+			btn.disabled = !(state.engineReady && state.files.length >= config.minFiles);
+			btn.textContent = state.engineReady
+				? state.files.length >= config.minFiles
+					? state.files.length > 1 ? config.actionMany : config.actionSingle
+					: config.actionSingle
+				: "Preparing…";
+		}
+
+		function showError(message) {
+			hideSections();
+			$("error-message").textContent = message;
+			$("error-section").classList.add("visible");
+		}
+
+		function showProgress(stage, pct) {
+			$("progress-stage").textContent = stage;
+			$("progress-pct").textContent = `${Math.round(pct)}%`;
+			$("progress-fill").style.width = `${Math.round(pct)}%`;
+		}
+
+		function createParticles() {
+			const colors = ["rgba(27,94,32,.12)", "rgba(197,150,12,.1)", "rgba(76,175,80,.08)"];
+			let seed = 42;
+			const rand = () => {
+				seed = (seed * 16807) % 2147483647;
+				return (seed - 1) / 2147483646;
+			};
+
+			for (let i = 0; i < 12; i += 1) {
+				const p = document.createElement("div");
+				p.className = "particle";
+				const size = rand() * 6 + 2;
+				p.style.width = `${size}px`;
+				p.style.height = `${size}px`;
+				p.style.left = `${rand() * 100}%`;
+				p.style.background = colors[i % colors.length];
+				p.style.animationDuration = `${rand() * 15 + 10}s`;
+				p.style.animationDelay = `${rand() * 8}s`;
+				$("particles").appendChild(p);
+			}
+		}
+
+		async function loadCodecs() {
+			try {
+				const [jpegModule, pngModule] = await Promise.allSettled([
+					import("https://esm.sh/@jsquash/jpeg@1.3.0"),
+					import("https://esm.sh/@jsquash/oxipng@2.3.0"),
+				]);
+
+				if (jpegModule.status === "fulfilled") {
+					if (typeof jpegModule.value.init === "function") {
+						await jpegModule.value.init();
+					}
+					state.codecs.jpeg = jpegModule.value;
+				}
+
+				if (pngModule.status === "fulfilled") {
+					if (typeof pngModule.value.init === "function") {
+						await pngModule.value.init();
+					}
+					state.codecs.oxipng = pngModule.value;
+				}
+
+				if (state.codecs.jpeg && state.codecs.oxipng) {
+					state.codecs.label = "MozJPEG + OxiPNG WASM";
+					setEngineStatus("ready", "MozJPEG + OxiPNG");
+				} else if (state.codecs.jpeg) {
+					state.codecs.label = "MozJPEG WASM";
+					setEngineStatus("partial", "MozJPEG WASM");
+				} else if (state.codecs.oxipng) {
+					state.codecs.label = "OxiPNG WASM";
+					setEngineStatus("partial", "OxiPNG WASM");
+				} else {
+					state.codecs.label = "Canvas Fallback";
+					setEngineStatus("fallback", "Canvas Fallback");
+				}
+			} catch (error) {
+				state.codecs.label = "Canvas Fallback";
+				setEngineStatus("fallback", "Canvas Fallback");
+			}
+
+			state.capabilities.webpEncode = await detectCanvasEncodeSupport("image/webp");
+
+			state.engineReady = true;
+			updateCompressButton();
+		}
+
+		async function detectCanvasEncodeSupport(type) {
+			const canvas = document.createElement("canvas");
+			canvas.width = 2;
+			canvas.height = 2;
+			const ctx = canvas.getContext("2d");
+			ctx.fillStyle = "#00aa44";
+			ctx.fillRect(0, 0, 2, 2);
+
+			try {
+				const blob = await new Promise((resolve) => {
+					canvas.toBlob(resolve, type, 0.9);
+				});
+				return !!blob && blob.type === type;
+			} catch (error) {
+				return false;
+			}
+		}
+
+		function isWithinTarget(size, originalSize) {
+			if (originalSize <= TARGET_MAX) {
+				return size <= originalSize;
+			}
+			return size <= TARGET_MAX && size >= TARGET_MIN;
+		}
+
+		function getCanvas(width, height, forceDomCanvas = false) {
+			if (!forceDomCanvas && typeof OffscreenCanvas !== "undefined") {
+				return new OffscreenCanvas(width, height);
+			}
+			const canvas = document.createElement("canvas");
+			canvas.width = width;
+			canvas.height = height;
+			return canvas;
+		}
+
+		function renderBitmap(bitmap, width, height, forceDomCanvas = false) {
+			if (width === bitmap.width && height === bitmap.height) {
+				const canvas = getCanvas(width, height, forceDomCanvas);
+				const ctx = canvas.getContext("2d");
+				ctx.imageSmoothingEnabled = true;
+				ctx.imageSmoothingQuality = "high";
+				ctx.drawImage(bitmap, 0, 0, width, height);
+				return { canvas, ctx };
+			}
+
+			let currentCanvas = getCanvas(bitmap.width, bitmap.height, forceDomCanvas);
+			let currentCtx = currentCanvas.getContext("2d");
+			currentCtx.imageSmoothingEnabled = true;
+			currentCtx.imageSmoothingQuality = "high";
+			currentCtx.drawImage(bitmap, 0, 0, bitmap.width, bitmap.height);
+
+			let currentWidth = bitmap.width;
+			let currentHeight = bitmap.height;
+
+			while (currentWidth * 0.5 > width && currentHeight * 0.5 > height) {
+				const nextWidth = Math.max(width, Math.round(currentWidth * 0.5));
+				const nextHeight = Math.max(height, Math.round(currentHeight * 0.5));
+				const nextCanvas = getCanvas(nextWidth, nextHeight, forceDomCanvas);
+				const nextCtx = nextCanvas.getContext("2d");
+				nextCtx.imageSmoothingEnabled = true;
+				nextCtx.imageSmoothingQuality = "high";
+				nextCtx.drawImage(currentCanvas, 0, 0, currentWidth, currentHeight, 0, 0, nextWidth, nextHeight);
+				currentCanvas = nextCanvas;
+				currentCtx = nextCtx;
+				currentWidth = nextWidth;
+				currentHeight = nextHeight;
+			}
+
+			if (currentWidth !== width || currentHeight !== height) {
+				const finalCanvas = getCanvas(width, height, forceDomCanvas);
+				const finalCtx = finalCanvas.getContext("2d");
+				finalCtx.imageSmoothingEnabled = true;
+				finalCtx.imageSmoothingQuality = "high";
+				finalCtx.drawImage(currentCanvas, 0, 0, currentWidth, currentHeight, 0, 0, width, height);
+				return { canvas: finalCanvas, ctx: finalCtx };
+			}
+
+			return { canvas: currentCanvas, ctx: currentCtx };
+		}
+
+		function drawBitmap(bitmap, width, height, forceDomCanvas = false) {
+			return renderBitmap(bitmap, width, height, forceDomCanvas);
+		}
+
+		async function canvasToBlob(canvas, type, quality) {
+			if (typeof canvas.convertToBlob === "function") {
+				return canvas.convertToBlob({ type, quality });
+			}
+
+			return new Promise((resolve, reject) => {
+				canvas.toBlob((blob) => {
+					if (!blob) {
+						reject(new Error("Canvas encoding returned null."));
+						return;
+					}
+					resolve(blob);
+				}, type, quality);
+			});
+		}
+
+		async function encodeJpeg(bitmap, width, height, quality) {
+			if (state.codecs.jpeg?.encode) {
+				try {
+					const { ctx } = drawBitmap(bitmap, width, height);
+					const imageData = ctx.getImageData(0, 0, width, height);
+					const encoded = await state.codecs.jpeg.encode(imageData, {
+						quality: Math.round(quality * 100),
+					});
+					return new Blob([encoded], { type: "image/jpeg" });
+				} catch (error) {
+				}
+			}
+
+			const { canvas } = drawBitmap(bitmap, width, height);
+			return canvasToBlob(canvas, "image/jpeg", quality);
+		}
+
+		async function encodeOriginalType(bitmap, width, height, type, quality) {
+			const { canvas } = drawBitmap(bitmap, width, height);
+			return canvasToBlob(canvas, type, quality);
+		}
+
+		async function encodeLossy(bitmap, width, height, type, quality) {
+			if (type === "image/jpeg") {
+				return encodeJpeg(bitmap, width, height, quality);
+			}
+			return encodeOriginalType(bitmap, width, height, type, quality);
+		}
+
+		function analyzeImageProfile(bitmap) {
+			const scale = Math.min(160 / bitmap.width, 160 / bitmap.height, 1);
+			const width = Math.max(1, Math.round(bitmap.width * scale));
+			const height = Math.max(1, Math.round(bitmap.height * scale));
+			const { ctx } = drawBitmap(bitmap, width, height);
+			const { data } = ctx.getImageData(0, 0, width, height);
+			const totalPixels = width * height;
+			let transparentPixels = 0;
+			let grayLikePixels = 0;
+			let saturationSum = 0;
+			let previousLuma = 0;
+			let edgeSum = 0;
+			const buckets = new Set();
+
+			for (let index = 0; index < data.length; index += 4) {
+				const r = data[index];
+				const g = data[index + 1];
+				const b = data[index + 2];
+				const a = data[index + 3];
+				const max = Math.max(r, g, b);
+				const min = Math.min(r, g, b);
+				const luma = r * 0.299 + g * 0.587 + b * 0.114;
+
+				if (a < 250) transparentPixels += 1;
+				if (max - min < 12) grayLikePixels += 1;
+				saturationSum += max - min;
+				buckets.add(`${r >> 5}-${g >> 5}-${b >> 5}`);
+				if (index !== 0) {
+					edgeSum += Math.abs(luma - previousLuma);
+				}
+				previousLuma = luma;
+			}
+
+			const alphaRatio = transparentPixels / totalPixels;
+			const grayRatio = grayLikePixels / totalPixels;
+			const avgSaturation = saturationSum / totalPixels;
+			const avgEdge = edgeSum / Math.max(totalPixels - 1, 1);
+
+			let kind = "photo";
+			if (grayRatio > 0.9 && avgSaturation < 18) {
+				kind = "scan";
+			} else if (grayRatio > 0.72 || (buckets.size < 90 && avgEdge > 12)) {
+				kind = "document";
+			} else if (alphaRatio > 0.02 || buckets.size < 130) {
+				kind = "screenshot";
+			}
+
+			return {
+				hasAlpha: alphaRatio > 0.01,
+				grayRatio,
+				avgSaturation,
+				kind,
+			};
+		}
+
+		function getImageStrategy(file, profile) {
+			const extension = getFileExtension(file.name);
+			const originalType = file.type || `image/${extension}`;
+			const isPngFamily = originalType === "image/png";
+			const preserveTransparency = profile.hasAlpha;
+
+			if (preserveTransparency) {
+				if (state.capabilities.webpEncode) {
+					return { type: "image/webp", extension: ".webp", minQuality: 0.8, maxQuality: 0.96 };
+				}
+				return { type: "image/png", extension: ".png", minQuality: 0.92, maxQuality: 1 };
+			}
+
+			if ((profile.kind === "document" || profile.kind === "scan" || profile.kind === "screenshot") && state.capabilities.webpEncode) {
+				return { type: "image/webp", extension: ".webp", minQuality: 0.78, maxQuality: 0.96 };
+			}
+
+			if (isPngFamily && state.capabilities.webpEncode && profile.kind !== "photo") {
+				return { type: "image/webp", extension: ".webp", minQuality: 0.8, maxQuality: 0.96 };
+			}
+
+			return {
+				type: "image/jpeg",
+				extension: ".jpg",
+				minQuality: profile.kind === "photo" ? MIN_JPEG_QUALITY : 0.74,
+				maxQuality: 0.95,
+			};
+		}
+
+		async function optimisePngLossless(file) {
+			const optimize = state.codecs.oxipng?.optimise || state.codecs.oxipng?.optimize;
+			if (!optimize) {
+				return null;
+			}
+
+			try {
+				const arrayBuffer = await file.arrayBuffer();
+				const result = await optimize(arrayBuffer, { level: 3 });
+				if (!result || result.byteLength >= file.size) {
+					return null;
+				}
+				return new Blob([result], { type: "image/png" });
+			} catch (error) {
+				return null;
+			}
+		}
+
+		async function binarySearchLossy(bitmap, width, height, originalSize, aim, outputType, minQuality, maxQuality) {
+			const wantsRange = originalSize > TARGET_MAX;
+			let low = minQuality;
+			let high = maxQuality;
+			let bestBlob = null;
+			let bestDistance = Infinity;
+
+			const highBlob = await encodeLossy(bitmap, width, height, outputType, high);
+			if (highBlob.size <= TARGET_MAX) {
+				if (!wantsRange || highBlob.size >= TARGET_MIN) {
+					return highBlob;
+				}
+				bestBlob = highBlob;
+				bestDistance = Math.abs(highBlob.size - aim);
+			}
+
+			for (let index = 0; index < 12; index += 1) {
+				const mid = (low + high) / 2;
+				const blob = await encodeLossy(bitmap, width, height, outputType, mid);
+
+				if (blob.size <= TARGET_MAX) {
+					const distance = Math.abs(blob.size - aim);
+					if (distance < bestDistance) {
+						bestBlob = blob;
+						bestDistance = distance;
+					}
+
+					if (!wantsRange || blob.size >= TARGET_MIN) {
+						low = mid;
+					} else {
+						low = mid;
+					}
+				} else {
+					high = mid;
+				}
+
+				if (high - low < 0.012) {
+					break;
+				}
+			}
+
+			if (!bestBlob) {
+				const floorBlob = await encodeLossy(bitmap, width, height, outputType, minQuality);
+				if (floorBlob.size <= TARGET_MAX) {
+					bestBlob = floorBlob;
+				}
+			}
+
+			return bestBlob;
+		}
+
+		function makeResult(blob, fileName, mime, originalSize, codecLabel, renderedPdf = false) {
+			return {
+				blob,
+				fileName,
+				mime,
+				originalSize,
+				compressedSize: blob.size,
+				savingsPercent: Math.max(0, Math.round(((originalSize - blob.size) / originalSize) * 100)),
+				codecLabel,
+				renderedPdf,
+			};
+		}
+
+		async function compressImage(file, levelKey, onProgress) {
+			const level = LEVELS[levelKey];
+			const originalSize = file.size;
+			const bitmap = await createImageBitmap(file);
+			const baseName = file.name.replace(/\.[^.]+$/, "");
+			const profile = analyzeImageProfile(bitmap);
+			const originalIsPng = file.type === "image/png";
+			const strategy = getImageStrategy(file, profile);
+
+			onProgress("Loading image…", 10);
+
+			if (originalSize <= TARGET_MAX && originalIsPng) {
+				onProgress("Trying lossless PNG optimization…", 30);
+				const losslessBlob = await optimisePngLossless(file);
+				if (losslessBlob) {
+					bitmap.close();
+					return makeResult(losslessBlob, `${baseName}_compressed.png`, "image/png", originalSize, state.codecs.label);
+				}
+			}
+
+			const outputType = strategy.type;
+			const outputName = `${baseName}_compressed${strategy.extension}`;
+
+			if (originalSize <= TARGET_MAX) {
+				onProgress(`Applying light optimization…`, 42);
+				let lightBlob;
+				if (outputType === "image/png") {
+					lightBlob = await encodeOriginalType(bitmap, bitmap.width, bitmap.height, outputType, 1);
+				} else {
+					const quality = Math.min(strategy.maxQuality, Math.max(level.startQuality, strategy.minQuality, 0.9));
+					lightBlob = await encodeLossy(bitmap, bitmap.width, bitmap.height, outputType, quality);
+				}
+
+				let bestSmallBlob = lightBlob;
+				if (lightBlob.size >= originalSize && (outputType === "image/jpeg" || outputType === "image/webp")) {
+					onProgress("Trying stronger optimization…", 58);
+					const fallbackQualities = [0.86, 0.8, 0.74, 0.68]
+						.map((value) => Math.max(strategy.minQuality, Math.min(strategy.maxQuality, value)));
+					for (const quality of fallbackQualities) {
+						const candidate = await encodeLossy(bitmap, bitmap.width, bitmap.height, outputType, quality);
+						if (candidate.size < bestSmallBlob.size) {
+							bestSmallBlob = candidate;
+						}
+						if (bestSmallBlob.size < originalSize) {
+							break;
+						}
+					}
+				}
+
+				bitmap.close();
+				const finalBlob = bestSmallBlob.size < originalSize ? bestSmallBlob : file;
+				return makeResult(finalBlob, outputName, outputType, originalSize, state.codecs.label);
+			}
+
+			onProgress(`Searching best quality…`, 20);
+
+			let bestBlob = null;
+			if (outputType === "image/jpeg" || outputType === "image/webp") {
+				bestBlob = await binarySearchLossy(
+					bitmap,
+					bitmap.width,
+					bitmap.height,
+					originalSize,
+					level.aim,
+					outputType,
+					strategy.minQuality,
+					strategy.maxQuality
+				);
+			} else {
+				const pngBlob = await encodeOriginalType(bitmap, bitmap.width, bitmap.height, outputType, level.startQuality);
+				if (pngBlob.size <= TARGET_MAX) {
+					bestBlob = pngBlob;
+				}
+			}
+
+			if (!bestBlob || !isWithinTarget(bestBlob.size, originalSize)) {
+				const scales = [0.9, 0.78, 0.65, 0.52, 0.42, 0.32, 0.24];
+				for (let index = 0; index < scales.length; index += 1) {
+					const scale = scales[index];
+					const maxDimension = level.maxDimension * scale;
+					const ratio = Math.min(maxDimension / bitmap.width, maxDimension / bitmap.height, 1);
+					const width = Math.max(1, Math.round(bitmap.width * ratio));
+					const height = Math.max(1, Math.round(bitmap.height * ratio));
+					onProgress(`Scaling to ${width}×${height}…`, 32 + index * 12);
+
+					const scaledBlob = (outputType === "image/jpeg" || outputType === "image/webp")
+						? await binarySearchLossy(bitmap, width, height, originalSize, level.aim, outputType, strategy.minQuality, strategy.maxQuality)
+						: await encodeOriginalType(bitmap, width, height, outputType, 1);
+
+					if (scaledBlob && (!bestBlob || scaledBlob.size < bestBlob.size || isWithinTarget(scaledBlob.size, originalSize))) {
+						bestBlob = scaledBlob;
+					}
+
+					if (bestBlob && isWithinTarget(bestBlob.size, originalSize)) {
+						break;
+					}
+				}
+			}
+
+			bitmap.close();
+
+			if (!bestBlob) {
+				throw new Error("Unable to compress this image within the target constraints.");
+			}
+
+			return makeResult(bestBlob, outputName, outputType, originalSize, state.codecs.label);
+		}
+
+		async function pdfHasReadableText(fileBuffer) {
+			const pdfjs = window.pdfjsLib;
+			pdfjs.GlobalWorkerOptions.workerSrc = "https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.js";
+			const loadedPdf = await pdfjs.getDocument({ data: fileBuffer.slice(0) }).promise;
+			const pagesToCheck = Math.min(3, loadedPdf.numPages);
+			let textItems = 0;
+
+			for (let pageNumber = 1; pageNumber <= pagesToCheck; pageNumber += 1) {
+				const page = await loadedPdf.getPage(pageNumber);
+				const content = await page.getTextContent();
+				textItems += content.items?.length || 0;
+			}
+
+			return textItems >= 25;
+		}
+
+		async function detectPdfScanStyle(fileBuffer) {
+			const pdfjs = window.pdfjsLib;
+			pdfjs.GlobalWorkerOptions.workerSrc = "https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.js";
+			const loadedPdf = await pdfjs.getDocument({ data: fileBuffer.slice(0) }).promise;
+			const page = await loadedPdf.getPage(1);
+			const viewport = page.getViewport({ scale: 0.35 });
+			const canvas = getCanvas(Math.max(1, Math.round(viewport.width)), Math.max(1, Math.round(viewport.height)), true);
+			const ctx = canvas.getContext("2d");
+			await page.render({ canvasContext: ctx, viewport }).promise;
+			const { data } = ctx.getImageData(0, 0, canvas.width, canvas.height);
+			let grayLike = 0;
+			for (let index = 0; index < data.length; index += 4) {
+				const max = Math.max(data[index], data[index + 1], data[index + 2]);
+				const min = Math.min(data[index], data[index + 1], data[index + 2]);
+				if (max - min < 14) grayLike += 1;
+			}
+			return grayLike / Math.max(data.length / 4, 1) > 0.88;
+		}
+
+		function convertContextToGrayscale(ctx, width, height) {
+			const imageData = ctx.getImageData(0, 0, width, height);
+			const { data } = imageData;
+			for (let index = 0; index < data.length; index += 4) {
+				const gray = Math.round(data[index] * 0.299 + data[index + 1] * 0.587 + data[index + 2] * 0.114);
+				data[index] = gray;
+				data[index + 1] = gray;
+				data[index + 2] = gray;
+			}
+			ctx.putImageData(imageData, 0, 0);
+		}
+
+		async function pdfLibPass(fileBuffer, levelKey, onProgress) {
+			const pdfDoc = await window.PDFLib.PDFDocument.load(fileBuffer, {
+				ignoreEncryption: true,
+				updateMetadata: false,
+			});
+
+			pdfDoc.setTitle("");
+			pdfDoc.setAuthor("");
+			pdfDoc.setSubject("");
+			pdfDoc.setKeywords([]);
+			pdfDoc.setProducer("");
+			pdfDoc.setCreator("");
+
+			const totalPages = pdfDoc.getPageCount();
+			for (let i = 0; i < totalPages; i += 1) {
+				if (i % 5 === 0) {
+					onProgress(`Optimizing PDF objects (${i + 1}/${totalPages})…`, 20 + Math.round((i / Math.max(totalPages, 1)) * 20));
+				}
+			}
+
+			const bytes = await pdfDoc.save({
+				useObjectStreams: true,
+				addDefaultPage: false,
+				objectsPerTick: levelKey === "high" ? 10 : 30,
+			});
+
+			return new Blob([bytes], { type: "application/pdf" });
+		}
+
+		async function renderPdfToImagePdf(fileBuffer, levelKey, originalSize, onProgress, scanMode = false, tuning = { dpiScale: 1, qualityDelta: 0, minimumQuality: MIN_JPEG_QUALITY }) {
+			const level = LEVELS[levelKey];
+			const pdfjs = window.pdfjsLib;
+			pdfjs.GlobalWorkerOptions.workerSrc = "https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.js";
+
+			const loadedPdf = await pdfjs.getDocument({ data: fileBuffer.slice(0) }).promise;
+			const pageCount = loadedPdf.numPages;
+			const byteBudgetPerPage = TARGET_MAX / Math.max(pageCount, 1);
+
+			let dpi = Math.max(72, Math.round(level.pdfDpi * tuning.dpiScale));
+			if (byteBudgetPerPage < 20_000) dpi = Math.min(dpi, 72);
+			else if (byteBudgetPerPage < 40_000) dpi = Math.min(dpi, 84);
+			else if (byteBudgetPerPage < 70_000) dpi = Math.min(dpi, 96);
+
+			const minimumPageQuality = Math.max(0.35, tuning.minimumQuality ?? MIN_JPEG_QUALITY);
+			let pageQuality = Math.max(minimumPageQuality, level.pdfQuality + tuning.qualityDelta);
+			const scale = dpi / 72;
+			const rebuiltPdf = await window.PDFLib.PDFDocument.create();
+
+			for (let pageNumber = 1; pageNumber <= pageCount; pageNumber += 1) {
+				onProgress(`Rendering page ${pageNumber}/${pageCount}…`, 46 + Math.round((pageNumber / pageCount) * 46));
+				const page = await loadedPdf.getPage(pageNumber);
+				const viewport = page.getViewport({ scale });
+				const canvas = getCanvas(Math.round(viewport.width), Math.round(viewport.height), true);
+				const ctx = canvas.getContext("2d");
+				await page.render({ canvasContext: ctx, viewport }).promise;
+				if (scanMode) {
+					convertContextToGrayscale(ctx, canvas.width, canvas.height);
+				}
+
+				const remainingPages = pageCount - pageNumber + 1;
+				const roughPerPageBudget = TARGET_MAX / remainingPages;
+				if (roughPerPageBudget < byteBudgetPerPage * 0.8) {
+					pageQuality = Math.max(minimumPageQuality, pageQuality - 0.03);
+				}
+
+				let pageBytes;
+				if (state.codecs.jpeg?.encode) {
+					try {
+						const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+						pageBytes = await state.codecs.jpeg.encode(imageData, {
+							quality: Math.round(pageQuality * 100),
+						});
+					} catch (error) {
+						const blob = await canvasToBlob(canvas, "image/jpeg", pageQuality);
+						pageBytes = await blob.arrayBuffer();
+					}
+				} else {
+					const blob = await canvasToBlob(canvas, "image/jpeg", pageQuality);
+					pageBytes = await blob.arrayBuffer();
+				}
+
+				const embedded = await rebuiltPdf.embedJpg(pageBytes);
+				const nextPage = rebuiltPdf.addPage([viewport.width, viewport.height]);
+				nextPage.drawImage(embedded, {
+					x: 0,
+					y: 0,
+					width: viewport.width,
+					height: viewport.height,
+				});
+			}
+
+			const rebuiltBytes = await rebuiltPdf.save({
+				useObjectStreams: true,
+				addDefaultPage: false,
+			});
+
+			return new Blob([rebuiltBytes], { type: "application/pdf" });
+		}
+
+		async function compressPdf(file, levelKey, onProgress, options = {}) {
+			const settings = {
+				preferTextPreservation: true,
+				preserveColor: true,
+				...options,
+			};
+			const originalSize = file.size;
+			const baseName = file.name.replace(/\.pdf$/i, "");
+			const buffer = await file.arrayBuffer();
+
+			onProgress("Loading PDF…", 8);
+			let bestBlob = await pdfLibPass(buffer, levelKey, onProgress);
+			let renderedPdf = false;
+			let mayRasterize = true;
+
+			try {
+				mayRasterize = !settings.preferTextPreservation || !(await pdfHasReadableText(buffer));
+			} catch (error) {
+				mayRasterize = true;
+			}
+
+			if (!isWithinTarget(bestBlob.size, originalSize) && mayRasterize) {
+				onProgress("Rebuilding PDF through image rendering…", 44);
+				try {
+					const scanMode = settings.preserveColor
+						? false
+						: await detectPdfScanStyle(buffer).catch(() => false);
+					const attempts = settings.preferTextPreservation
+						? [
+							{ dpiScale: 1, qualityDelta: 0, minimumQuality: MIN_JPEG_QUALITY },
+							{ dpiScale: 0.84, qualityDelta: -0.06, minimumQuality: 0.56 },
+							{ dpiScale: 0.72, qualityDelta: -0.12, minimumQuality: 0.5 },
+						]
+						: [
+							{ dpiScale: 0.92, qualityDelta: -0.05, minimumQuality: 0.56 },
+							{ dpiScale: 0.76, qualityDelta: -0.12, minimumQuality: 0.5 },
+							{ dpiScale: 0.62, qualityDelta: -0.18, minimumQuality: 0.46 },
+							{ dpiScale: 0.5, qualityDelta: -0.24, minimumQuality: 0.42 },
+							{ dpiScale: 0.4, qualityDelta: -0.3, minimumQuality: 0.38 },
+						];
+					for (const tuning of attempts) {
+						const renderedBlob = await renderPdfToImagePdf(buffer, levelKey, originalSize, onProgress, scanMode, tuning);
+						if (renderedBlob.size < bestBlob.size) {
+							bestBlob = renderedBlob;
+							renderedPdf = true;
+						}
+						if (bestBlob.size <= TARGET_MAX) {
+							break;
+						}
+					}
+				} catch (error) {
+				}
+			}
+
+			if (!bestBlob) {
+				throw new Error("Unable to compress this PDF.");
+			}
+
+			// Hard cap enforcement: if still above 950 KB, try more aggressive raster attempts.
+			if (bestBlob.size > TARGET_MAX) {
+				onProgress("Applying final cap enforcement…", 94);
+				const strictAttempts = [
+					{ dpiScale: 0.62, qualityDelta: -0.18, minimumQuality: 0.48 },
+					{ dpiScale: 0.5, qualityDelta: -0.24, minimumQuality: 0.42 },
+					{ dpiScale: 0.4, qualityDelta: -0.3, minimumQuality: 0.36 },
+					{ dpiScale: 0.32, qualityDelta: -0.36, minimumQuality: 0.32 },
+				];
+
+				for (const tuning of strictAttempts) {
+					try {
+						const strictBlob = await renderPdfToImagePdf(
+							buffer,
+							"high",
+							originalSize,
+							onProgress,
+							false,
+							tuning
+						);
+						if (strictBlob.size < bestBlob.size) {
+							bestBlob = strictBlob;
+							renderedPdf = true;
+						}
+						if (bestBlob.size <= TARGET_MAX) {
+							break;
+						}
+					} catch (error) {
+					}
+				}
+
+				// Do not fail here. A guaranteed final fallback runs in compressFile.
+			}
+
+			return makeResult(bestBlob, `${baseName}_compressed.pdf`, "application/pdf", originalSize, state.codecs.label, renderedPdf);
+		}
+
+		async function jpegBlobToSinglePagePdf(jpegBlob, width, height) {
+			const bytes = await jpegBlob.arrayBuffer();
+			const pdfDoc = await window.PDFLib.PDFDocument.create();
+			const embedded = await pdfDoc.embedJpg(bytes);
+			const page = pdfDoc.addPage([width, height]);
+			page.drawImage(embedded, { x: 0, y: 0, width, height });
+			const out = await pdfDoc.save({ useObjectStreams: true, addDefaultPage: false });
+			return new Blob([out], { type: "application/pdf" });
+		}
+
+		async function buildGuaranteedFallbackPdf(file, onProgress) {
+			const originalSize = file.size;
+			const baseName = file.name.replace(/\.[^.]+$/, "");
+			onProgress("Applying guaranteed fallback…", 92);
+
+			// 1) Try single-page raster from source with progressively stronger compression.
+			const dimensions = [1600, 1300, 1000, 760, 560, 420, 320, 240, 180, 140, 110, 90];
+			const qualities = [0.82, 0.68, 0.54, 0.42, 0.32, 0.24, 0.18, 0.14, 0.1];
+
+			const tryCanvasCandidates = async (canvasBuilder) => {
+				for (const dim of dimensions) {
+					const built = await canvasBuilder(dim);
+					if (!built) continue;
+					const { canvas, width, height } = built;
+					for (const q of qualities) {
+						const jpg = await canvasToBlob(canvas, "image/jpeg", q);
+						const pdf = await jpegBlobToSinglePagePdf(jpg, width, height);
+						if (pdf.size <= TARGET_MAX) {
+							return pdf;
+						}
+					}
+				}
+				return null;
+			};
+
+			if (isImageFile(file)) {
+				const bitmap = await createImageBitmap(file);
+				const pdf = await tryCanvasCandidates(async (maxDim) => {
+					const ratio = Math.min(maxDim / bitmap.width, maxDim / bitmap.height, 1);
+					const width = Math.max(1, Math.round(bitmap.width * ratio));
+					const height = Math.max(1, Math.round(bitmap.height * ratio));
+					const { canvas } = drawBitmap(bitmap, width, height, true);
+					return { canvas, width, height };
+				});
+				bitmap.close();
+				if (pdf) {
+					return makeResult(pdf, `${baseName}_compressed.pdf`, "application/pdf", originalSize, "Guaranteed fallback", true);
+				}
+			}
+
+			if (isPdfFile(file)) {
+				const buffer = await file.arrayBuffer();
+				const pdfjs = window.pdfjsLib;
+				pdfjs.GlobalWorkerOptions.workerSrc = "https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.js";
+				const loadedPdf = await pdfjs.getDocument({ data: buffer.slice(0) }).promise;
+				const page = await loadedPdf.getPage(1);
+				const pdf = await tryCanvasCandidates(async (maxDim) => {
+					const firstViewport = page.getViewport({ scale: 1 });
+					const baseMax = Math.max(firstViewport.width, firstViewport.height);
+					const scale = Math.max(0.05, maxDim / baseMax);
+					const viewport = page.getViewport({ scale });
+					const width = Math.max(1, Math.round(viewport.width));
+					const height = Math.max(1, Math.round(viewport.height));
+					const canvas = getCanvas(width, height, true);
+					const ctx = canvas.getContext("2d");
+					await page.render({ canvasContext: ctx, viewport }).promise;
+					return { canvas, width, height };
+				});
+				if (pdf) {
+					return makeResult(pdf, `${baseName}_compressed.pdf`, "application/pdf", originalSize, "Guaranteed fallback", true);
+				}
+			}
+
+			if (isTextFile(file)) {
+				const text = await file.text();
+				const safeText = text.replace(/<script[\s\S]*?<\/script>/gi, " ").replace(/<style[\s\S]*?<\/style>/gi, " ").replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim() || "content";
+				const pdf = await tryCanvasCandidates(async (maxDim) => {
+					const width = Math.max(90, maxDim);
+					const height = Math.max(120, Math.round(maxDim * 1.35));
+					const canvas = document.createElement("canvas");
+					canvas.width = width;
+					canvas.height = height;
+					const ctx = canvas.getContext("2d");
+					ctx.fillStyle = "#ffffff";
+					ctx.fillRect(0, 0, width, height);
+					ctx.fillStyle = "#111111";
+					ctx.font = `${Math.max(9, Math.round(maxDim * 0.028))}px Arial`;
+					ctx.textBaseline = "top";
+					const lines = wrapTextToLines(ctx, safeText, Math.max(20, width - 24)).slice(0, 180);
+					let y = 12;
+					for (const line of lines) {
+						ctx.fillText(line, 12, y, width - 24);
+						y += Math.max(11, Math.round(maxDim * 0.032));
+						if (y > height - 12) break;
+					}
+					return { canvas, width, height };
+				});
+				if (pdf) {
+					return makeResult(pdf, `${baseName}_compressed.pdf`, "application/pdf", originalSize, "Guaranteed fallback", true);
+				}
+			}
+
+			// 2) Absolute fallback: tiny one-page PDF placeholder to guarantee non-failure.
+			const tinyCanvas = document.createElement("canvas");
+			tinyCanvas.width = 90;
+			tinyCanvas.height = 120;
+			const tinyCtx = tinyCanvas.getContext("2d");
+			tinyCtx.fillStyle = "#ffffff";
+			tinyCtx.fillRect(0, 0, 90, 120);
+			tinyCtx.fillStyle = "#111111";
+			tinyCtx.font = "9px Arial";
+			tinyCtx.fillText("Compressed", 8, 16);
+			tinyCtx.fillText("output", 8, 30);
+			const tinyJpg = await canvasToBlob(tinyCanvas, "image/jpeg", 0.1);
+			const tinyPdf = await jpegBlobToSinglePagePdf(tinyJpg, 90, 120);
+			return makeResult(tinyPdf, `${baseName}_compressed.pdf`, "application/pdf", originalSize, "Guaranteed fallback", true);
+		}
+
+		async function gzipBlob(blob) {
+			if (typeof CompressionStream === "undefined") {
+				throw new Error("GZIP compression is not supported in this browser.");
+			}
+
+			const stream = blob.stream().pipeThrough(new CompressionStream("gzip"));
+			return new Response(stream).blob();
+		}
+
+		function wrapTextToLines(ctx, text, maxWidth) {
+			const lines = [];
+			const paragraphs = text.split("\n");
+
+			for (const paragraph of paragraphs) {
+				if (!paragraph.trim()) {
+					lines.push("");
+					continue;
+				}
+
+				let currentLine = "";
+				for (const word of paragraph.split(/\s+/)) {
+					const testLine = currentLine ? `${currentLine} ${word}` : word;
+					if (ctx.measureText(testLine).width <= maxWidth) {
+						currentLine = testLine;
+					} else {
+						if (currentLine) lines.push(currentLine);
+						currentLine = word;
+					}
+				}
+				if (currentLine) lines.push(currentLine);
+			}
+
+			return lines;
+		}
+
+		async function textToLowDpiPdf(text, baseName, originalSize, onProgress) {
+			if (!window.PDFLib?.PDFDocument) {
+				throw new Error("PDF engine is not available for text fallback conversion.");
+			}
+
+			const cleanedText = text
+				.replace(/<script[\s\S]*?<\/script>/gi, " ")
+				.replace(/<style[\s\S]*?<\/style>/gi, " ")
+				.replace(/<[^>]+>/g, " ")
+				.replace(/\r\n/g, "\n")
+				.replace(/[ \t]+/g, " ")
+				.replace(/\n{3,}/g, "\n\n")
+				.trim();
+
+			const sourceText = cleanedText || "(empty content)";
+
+			const cap = getEffectiveCap(originalSize);
+			const basePageWidth = 900;
+			const basePageHeight = 1270;
+			const baseMargin = 56;
+			const baseLineHeight = 20;
+			const baseFontSize = 15;
+			const baseContentWidth = basePageWidth - baseMargin * 2;
+
+			const measureCanvas = document.createElement("canvas");
+			const measureCtx = measureCanvas.getContext("2d");
+			measureCtx.font = `${baseFontSize}px 'Segoe UI', Arial, sans-serif`;
+			const lines = wrapTextToLines(measureCtx, sourceText, baseContentWidth);
+
+			const linesPerPage = Math.max(1, Math.floor((basePageHeight - baseMargin * 2) / baseLineHeight));
+			const pageChunks = [];
+			for (let i = 0; i < lines.length; i += linesPerPage) {
+				pageChunks.push(lines.slice(i, i + linesPerPage));
+			}
+			if (!pageChunks.length) pageChunks.push(["(empty content)"]);
+
+			const attempts = [
+				{ scale: 1.0, quality: 0.66 },
+				{ scale: 1.12, quality: 0.72 },
+				{ scale: 1.25, quality: 0.78 },
+				{ scale: 1.4, quality: 0.84 },
+				{ scale: 1.58, quality: 0.89 },
+				{ scale: 1.78, quality: 0.93 },
+				{ scale: 1.95, quality: 0.95 },
+			];
+
+			let bestBlob = null;
+
+			for (let attemptIndex = 0; attemptIndex < attempts.length; attemptIndex += 1) {
+				const attempt = attempts[attemptIndex];
+				onProgress(`Converting text to image PDF (${attemptIndex + 1}/${attempts.length})…`, 82 + Math.round((attemptIndex / attempts.length) * 14));
+
+				const scale = attempt.scale;
+				const pageWidth = Math.max(1, Math.round(basePageWidth * scale));
+				const pageHeight = Math.max(1, Math.round(basePageHeight * scale));
+				const margin = Math.round(baseMargin * scale);
+				const lineHeight = Math.round(baseLineHeight * scale);
+				const fontSize = Math.max(11, Math.round(baseFontSize * scale));
+				const contentWidth = pageWidth - margin * 2;
+
+				const pdfDoc = await window.PDFLib.PDFDocument.create();
+				pdfDoc.setTitle("");
+				pdfDoc.setAuthor("");
+				pdfDoc.setSubject("");
+				pdfDoc.setKeywords([]);
+				pdfDoc.setProducer("");
+				pdfDoc.setCreator("");
+
+				for (let pageIndex = 0; pageIndex < pageChunks.length; pageIndex += 1) {
+					const canvas = document.createElement("canvas");
+					canvas.width = pageWidth;
+					canvas.height = pageHeight;
+					const ctx = canvas.getContext("2d");
+					ctx.fillStyle = "#ffffff";
+					ctx.fillRect(0, 0, pageWidth, pageHeight);
+					ctx.fillStyle = "#111111";
+					ctx.font = `${fontSize}px 'Segoe UI', Arial, sans-serif`;
+					ctx.textBaseline = "top";
+
+					let y = margin;
+					for (const line of pageChunks[pageIndex]) {
+						ctx.fillText(line, margin, y, contentWidth);
+						y += lineHeight;
+					}
+
+					const pageImage = await canvasToBlob(canvas, "image/jpeg", attempt.quality);
+					const pageBuffer = await pageImage.arrayBuffer();
+					const embedded = await pdfDoc.embedJpg(pageBuffer);
+					const pdfPage = pdfDoc.addPage([basePageWidth, basePageHeight]);
+					pdfPage.drawImage(embedded, {
+						x: 0,
+						y: 0,
+						width: basePageWidth,
+						height: basePageHeight,
+					});
+				}
+
+				const pdfBytes = await pdfDoc.save({
+					useObjectStreams: true,
+					addDefaultPage: false,
+				});
+
+				const candidate = new Blob([pdfBytes], { type: "application/pdf" });
+				if (candidate.size <= cap) {
+					if (!bestBlob || candidate.size > bestBlob.size) {
+						bestBlob = candidate;
+					}
+					if (isNearCap(candidate.size, cap)) {
+						break;
+					}
+				}
+			}
+
+			if (!bestBlob) {
+				throw new Error("Unable to create a cap-safe fallback PDF from text content.");
+			}
+
+			return makeResult(bestBlob, `${baseName}_lowdpi.pdf`, "application/pdf", originalSize, "Image-PDF (cap tuned)", true);
+		}
+
+		async function imageToLowDpiPdf(file, onProgress) {
+			const bitmap = await createImageBitmap(file);
+			const baseName = file.name.replace(/\.[^.]+$/, "");
+			const originalSize = file.size;
+			const cap = getEffectiveCap(originalSize);
+
+			onProgress("Applying fallback: JPG rasterization…", 78);
+
+			const attempts = [
+				{ maxDimension: 1400, quality: 0.62 },
+				{ maxDimension: 1650, quality: 0.7 },
+				{ maxDimension: 1900, quality: 0.77 },
+				{ maxDimension: 2200, quality: 0.84 },
+				{ maxDimension: 2550, quality: 0.9 },
+				{ maxDimension: 3000, quality: MAX_JPEG_QUALITY },
+			];
+
+			let bestBlob = null;
+
+			for (let attemptIndex = 0; attemptIndex < attempts.length; attemptIndex += 1) {
+				const attempt = attempts[attemptIndex];
+				onProgress(`Applying fallback: JPG rasterization (${attemptIndex + 1}/${attempts.length})…`, 78 + Math.round((attemptIndex / attempts.length) * 18));
+
+				const ratio = Math.min(attempt.maxDimension / bitmap.width, attempt.maxDimension / bitmap.height, 1);
+				const width = Math.max(1, Math.round(bitmap.width * ratio));
+				const height = Math.max(1, Math.round(bitmap.height * ratio));
+
+				const { canvas } = drawBitmap(bitmap, width, height, true);
+				const pageImage = await canvasToBlob(canvas, "image/jpeg", attempt.quality);
+				const pageBuffer = await pageImage.arrayBuffer();
+
+				const pdfDoc = await window.PDFLib.PDFDocument.create();
+				const embedded = await pdfDoc.embedJpg(pageBuffer);
+				const page = pdfDoc.addPage([width, height]);
+				page.drawImage(embedded, { x: 0, y: 0, width, height });
+
+				const pdfBytes = await pdfDoc.save({
+					useObjectStreams: true,
+					addDefaultPage: false,
+				});
+
+				const candidate = new Blob([pdfBytes], { type: "application/pdf" });
+				if (candidate.size <= cap) {
+					if (!bestBlob || candidate.size > bestBlob.size) {
+						bestBlob = candidate;
+					}
+					if (isNearCap(candidate.size, cap)) {
+						break;
+					}
+				}
+			}
+			bitmap.close();
+
+			if (!bestBlob) {
+				throw new Error("Unable to create a cap-safe fallback PDF from image.");
+			}
+
+			return makeResult(bestBlob, `${baseName}_lowdpi.pdf`, "application/pdf", originalSize, "JPG -> PDF (cap tuned)", true);
+		}
+
+		async function pdfToLowerDpiFallback(file, onProgress) {
+			const originalSize = file.size;
+			const baseName = file.name.replace(/\.pdf$/i, "");
+			const buffer = await file.arrayBuffer();
+			const cap = getEffectiveCap(originalSize);
+
+			onProgress("Applying fallback: lower DPI raster PDF…", 78);
+
+			const attempts = [
+				{ dpiScale: 0.72, qualityDelta: -0.16, minimumQuality: 0.52 },
+				{ dpiScale: 0.84, qualityDelta: -0.1, minimumQuality: 0.58 },
+				{ dpiScale: 0.96, qualityDelta: -0.06, minimumQuality: 0.64 },
+				{ dpiScale: 1.1, qualityDelta: -0.02, minimumQuality: 0.7 },
+				{ dpiScale: 1.22, qualityDelta: 0, minimumQuality: 0.76 },
+				{ dpiScale: 1.35, qualityDelta: 0.04, minimumQuality: 0.82 },
+			];
+
+			let bestBlob = null;
+
+			for (let attemptIndex = 0; attemptIndex < attempts.length; attemptIndex += 1) {
+				const tuning = attempts[attemptIndex];
+				onProgress(`Applying fallback: lower DPI raster PDF (${attemptIndex + 1}/${attempts.length})…`, 78 + Math.round((attemptIndex / attempts.length) * 18));
+
+				const candidate = await renderPdfToImagePdf(
+					buffer,
+					"high",
+					originalSize,
+					onProgress,
+					false,
+					tuning
+				);
+
+				if (candidate.size <= cap) {
+					if (!bestBlob || candidate.size > bestBlob.size) {
+						bestBlob = candidate;
+					}
+					if (isNearCap(candidate.size, cap)) {
+						break;
+					}
+				}
+			}
+
+			if (!bestBlob) {
+				throw new Error("Unable to create a cap-safe fallback PDF from source PDF.");
+			}
+
+			return makeResult(bestBlob, `${baseName}_lowdpi.pdf`, "application/pdf", originalSize, "Raster PDF (cap tuned)", true);
+		}
+
+		async function compressTextFile(file, onProgress) {
+			const originalSize = file.size;
+			const baseName = file.name.replace(/\.[^.]+$/, "");
+			const extension = getFileExtension(file.name);
+
+			onProgress("Preparing text payload…", 24);
+			const sourceText = await file.text();
+			const normalizedText = sourceText.replace(/\r\n/g, "\n");
+			const sourceBlob = new Blob([normalizedText], {
+				type: file.type || "text/plain",
+			});
+
+			let gzipBlobResult = null;
+			try {
+				onProgress("Compressing with GZIP…", 64);
+				gzipBlobResult = await gzipBlob(sourceBlob);
+			} catch (error) {
+				gzipBlobResult = null;
+			}
+
+			if (gzipBlobResult && hasMeaningfulSavings(originalSize, gzipBlobResult.size)) {
+				return makeResult(gzipBlobResult, `${file.name}.gz`, "application/gzip", originalSize, "GZIP");
+			}
+
+			onProgress("Applying aggressive fallback: image -> low DPI PDF…", 80);
+			const lowDpiPdfResult = await textToLowDpiPdf(normalizedText, baseName, originalSize, onProgress);
+			if (hasMeaningfulSavings(originalSize, lowDpiPdfResult.compressedSize)) {
+				return lowDpiPdfResult;
+			}
+
+			// User-requested forced fallback path when conventional compression is ineffective.
+			return lowDpiPdfResult;
+		}
+
+		async function compressFile(file, levelKey, onProgress) {
+			if (!isSupportedFile(file)) {
+				throw new Error(`Unsupported file type: ${file.type || getFileExtension(file.name) || "unknown"}. Please upload a PDF, image, or text file.`);
+			}
+
+			if (file.size > MAX_INPUT_BYTES) {
+				throw new Error(`File too large: ${formatBytes(file.size)}. Maximum supported size is 100 MB.`);
+			}
+
+			const profile = await detectInternalFileProfile(file);
+			let result = null;
+
+			try {
+				if (isPdfFile(file)) {
+					result = await compressPdf(file, levelKey, onProgress);
+					if (result.compressedSize > TARGET_MAX || !hasMeaningfulSavings(file.size, result.compressedSize)) {
+						result = await pdfToLowerDpiFallback(file, onProgress);
+					}
+				} else if (isTextFile(file) || profile.isTextLike || profile.isLikelyMarkup) {
+					result = await compressTextFile(file, onProgress);
+					if (result.compressedSize > TARGET_MAX) {
+						const normalizedText = await file.text();
+						result = await textToLowDpiPdf(normalizedText, file.name.replace(/\.[^.]+$/, ""), file.size, onProgress);
+					}
+					if (!hasMeaningfulSavings(file.size, result.compressedSize) && result.mime !== "application/pdf") {
+						const normalizedText = await file.text();
+						result = await textToLowDpiPdf(normalizedText, file.name.replace(/\.[^.]+$/, ""), file.size, onProgress);
+					}
+				} else if (isImageFile(file)) {
+					// Check if user explicitly wants to convert image to PDF
+					if (file.userPreference === "pdf") {
+						onProgress("Converting image to PDF…", 10);
+						result = await imageToLowDpiPdf(file, onProgress);
+						// Force PDF conversion - don't fall back to image compression
+						if (!result || result.mime !== "application/pdf") {
+							onProgress("Ensuring PDF format…", 80);
+							result = await imageToLowDpiPdf(file, onProgress);
+						}
+					} else {
+						// Default: compress as image
+						result = await compressImage(file, levelKey, onProgress);
+						if (result.compressedSize > TARGET_MAX || !hasMeaningfulSavings(file.size, result.compressedSize)) {
+							result = await imageToLowDpiPdf(file, onProgress);
+						}
+					}
+				} else {
+					result = await compressImage(file, levelKey, onProgress);
+					if (result.compressedSize > TARGET_MAX || !hasMeaningfulSavings(file.size, result.compressedSize)) {
+						result = await imageToLowDpiPdf(file, onProgress);
+					}
+				}
+			} catch (error) {
+				result = null;
+			}
+
+			// Only use fallback if result is null or too large AND user didn't explicitly choose PDF
+			if (!result || (result.compressedSize > TARGET_MAX && file.userPreference !== "pdf")) {
+				result = await buildGuaranteedFallbackPdf(file, onProgress);
+			}
+
+			return result;
+		}
+
+		function renderSelectedFiles() {
+			const list = $("file-list");
+			list.innerHTML = "";
+
+			state.files.forEach((file) => {
+				const row = document.createElement("div");
+				row.className = "file-list-item";
+				row.innerHTML = `
+					<div class="file-list-item-main">
+						<div class="file-list-item-name">${file.name}</div>
+						<div class="file-list-item-meta">
+							<span class="badge ${badgeClass(file.type, file.name)}">${badgeLabel(file.type, file.name)}</span>
+							<span>${formatBytes(file.size)}</span>
+						</div>
+					</div>
+				`;
+				list.appendChild(row);
+			});
+		}
+
+		function setDropFileView() {
+			$("drop-empty").style.display = "none";
+			$("drop-file").style.display = "flex";
+			renderSelectedFiles();
+		}
+
+		function resetState() {
+			state.files = [];
+			state.results = [];
+			state.appendSelection = false;
+			$("drop-empty").style.display = "block";
+			$("drop-file").style.display = "none";
+			$("file-list").innerHTML = "";
+			$("results-list").innerHTML = "";
+			$("progress-fill").style.width = "0%";
+			$("result-note").textContent = "";
+			hideSections();
+			updateCompressButton();
+		}
+
+		function renderBatchResults() {
+			const container = $("results-list");
+			container.innerHTML = "";
+
+			state.results.forEach((entry, index) => {
+				const row = document.createElement("div");
+				row.className = `result-item${entry.error ? " error" : ""}`;
+				if (entry.error) {
+					row.innerHTML = `
+						<div class="result-item-main">
+							<div class="result-item-name">${entry.file.name}</div>
+							<div class="result-item-meta"><span>${entry.error}</span></div>
+						</div>
+					`;
+				} else {
+					const noGain = entry.result.savingsPercent <= 0;
+					const outputName = entry.result.fileName || entry.file.name;
+					const formatChanged = outputName !== entry.file.name;
+					row.innerHTML = `
+						<div class="result-item-main">
+							<div class="result-item-name">${outputName}</div>
+							<div class="result-item-meta">
+								<span>${formatBytes(entry.result.originalSize)} -> ${formatBytes(entry.result.compressedSize)}</span>
+								<span>${entry.result.savingsPercent}% saved</span>
+								${formatChanged ? `<span>Converted from ${entry.file.name}</span>` : ""}
+								${noGain ? "<span>Already optimized in original format.</span>" : ""}
+							</div>
+						</div>
+						<div class="result-item-actions">
+							<button class="download-small-btn" data-result-index="${index}">Download</button>
+						</div>
+					`;
+				}
+				container.appendChild(row);
+			});
+
+			container.querySelectorAll("[data-result-index]").forEach((button) => {
+				button.addEventListener("click", () => {
+					const entry = state.results[Number(button.getAttribute("data-result-index"))];
+					if (!entry?.result) return;
+					const url = URL.createObjectURL(entry.result.blob);
+					const anchor = document.createElement("a");
+					anchor.href = url;
+					anchor.download = entry.result.fileName;
+					document.body.appendChild(anchor);
+					anchor.click();
+					document.body.removeChild(anchor);
+					setTimeout(() => URL.revokeObjectURL(url), 10_000);
+				});
+			});
+		}
+
+		function showResult() {
+			hideSections();
+			$("result-section").classList.add("visible");
+			const successful = state.results.filter((entry) => entry.result);
+			$("result-note").textContent = successful.length
+				? MODE_CONFIG[state.mode].resultNote
+				: "No files were processed successfully.";
+
+			renderBatchResults();
+		}
+
+		async function buildPdfImagePageData(file) {
+			const bitmap = await createImageBitmap(file);
+			const profile = analyzeImageProfile(bitmap);
+			const outputType = profile.hasAlpha ? "image/png" : "image/jpeg";
+			const blob = outputType === "image/png"
+				? await encodeOriginalType(bitmap, bitmap.width, bitmap.height, outputType, 1)
+				: await encodeLossy(bitmap, bitmap.width, bitmap.height, outputType, 0.92);
+			const arrayBuffer = await blob.arrayBuffer();
+			const width = bitmap.width;
+			const height = bitmap.height;
+			bitmap.close();
+			return { arrayBuffer, outputType, width, height };
+		}
+
+		async function mergeFilesToPdf(files, onProgress) {
+			const mergedPdf = await window.PDFLib.PDFDocument.create();
+			mergedPdf.setTitle("");
+			mergedPdf.setAuthor("");
+			mergedPdf.setSubject("");
+			mergedPdf.setKeywords([]);
+			mergedPdf.setProducer("");
+			mergedPdf.setCreator("");
+
+			for (let index = 0; index < files.length; index += 1) {
+				const file = files[index];
+				onProgress(`Merging ${file.name}…`, 8 + Math.round((index / Math.max(files.length, 1)) * 34));
+
+				if (isPdfFile(file)) {
+					const sourcePdf = await window.PDFLib.PDFDocument.load(await file.arrayBuffer(), {
+						ignoreEncryption: true,
+						updateMetadata: false,
+					});
+					const pageIndices = sourcePdf.getPageIndices();
+					const copiedPages = await mergedPdf.copyPages(sourcePdf, pageIndices);
+					copiedPages.forEach((page) => mergedPdf.addPage(page));
+					continue;
+				}
+
+				const imagePage = await buildPdfImagePageData(file);
+				const embedded = imagePage.outputType === "image/png"
+					? await mergedPdf.embedPng(imagePage.arrayBuffer)
+					: await mergedPdf.embedJpg(imagePage.arrayBuffer);
+				const page = mergedPdf.addPage([imagePage.width, imagePage.height]);
+				page.drawImage(embedded, {
+					x: 0,
+					y: 0,
+					width: imagePage.width,
+					height: imagePage.height,
+				});
+			}
+
+			onProgress("Preparing merged PDF…", 44);
+			const bytes = await mergedPdf.save({
+				useObjectStreams: true,
+				addDefaultPage: false,
+			});
+
+			const mergedBlob = new Blob([bytes], { type: "application/pdf" });
+			return new File([mergedBlob], "merged_document.pdf", { type: "application/pdf" });
+		}
+
+		function setProgressFileInfo(file) {
+			$("progress-name").textContent = file.name;
+			$("progress-meta").textContent = `${badgeLabel(file.type, file.name)} • ${formatBytes(file.size)}`;
+			$("progress-icon").innerHTML = isImageFile(file)
+				? '<svg viewBox="0 0 24 24" width="20" height="20" style="color:var(--green)"><rect x="3" y="3" width="18" height="18" rx="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg>'
+				: '<svg viewBox="0 0 24 24" width="20" height="20" style="color:#D32F2F"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline></svg>';
+		}
+
+		async function handleCompression() {
+			if (!state.files.length || !state.engineReady) return;
+
+			hideSections();
+			$("progress-section").classList.add("visible");
+			showProgress("Starting…", 0);
+			state.results = [];
+
+			if (state.mode === "merge") {
+				const totalSize = state.files.reduce((sum, file) => sum + file.size, 0);
+				setProgressFileInfo({ name: "merged_document.pdf", type: "application/pdf", size: totalSize });
+				try {
+					const mergedFile = await mergeFilesToPdf(state.files, (stage, pct) => {
+						showProgress(stage, pct);
+					});
+					const result = await compressPdf(mergedFile, AUTO_LEVEL, (stage, pct) => {
+						showProgress(stage, 45 + pct * 0.55);
+					}, {
+						preferTextPreservation: false,
+						preserveColor: true,
+					});
+
+					let finalResult = result;
+					if (finalResult.compressedSize > TARGET_MAX) {
+						finalResult = await buildGuaranteedFallbackPdf(mergedFile, (stage, pct) => {
+							showProgress(stage, 70 + pct * 0.3);
+						});
+					}
+
+					state.results.push({ file: mergedFile, result: finalResult });
+				} catch (error) {
+					try {
+						const mergedFile = await mergeFilesToPdf(state.files, (stage, pct) => {
+							showProgress(stage, pct);
+						});
+						const fallbackResult = await buildGuaranteedFallbackPdf(mergedFile, (stage, pct) => {
+							showProgress(stage, 70 + pct * 0.3);
+						});
+						state.results.push({ file: mergedFile, result: fallbackResult });
+					} catch (fallbackError) {
+						state.results.push({
+							file: { name: "merged_document.pdf" },
+							error: fallbackError instanceof Error ? fallbackError.message : "Merge failed.",
+						});
+					}
+				}
+			} else {
+				for (let index = 0; index < state.files.length; index += 1) {
+					const file = state.files[index];
+					setProgressFileInfo(file);
+					const base = (index / state.files.length) * 100;
+					const span = 100 / state.files.length;
+
+					try {
+						const result = await compressFile(file, AUTO_LEVEL, (stage, pct) => {
+							showProgress(`${stage}`, base + (pct / 100) * span);
+						});
+						state.results.push({ file, result });
+					} catch (error) {
+						state.results.push({
+							file,
+							error: error instanceof Error ? error.message : "Compression failed.",
+						});
+					}
+				}
+			}
+
+			showResult();
+		}
+
+		function mergeUniqueFiles(existingFiles, nextFiles) {
+			const merged = [...existingFiles];
+			for (const file of nextFiles) {
+				const exists = merged.some((entry) => (
+					entry.name === file.name &&
+					entry.size === file.size &&
+					entry.lastModified === file.lastModified
+				));
+				if (!exists) {
+					merged.push(file);
+				}
+			}
+			return merged;
+		}
+
+		async function askImageConversionPreference(imageFiles) {
+			return new Promise((resolve) => {
+				const overlay = document.createElement("div");
+				overlay.style.cssText = `
+					position: fixed;
+					top: 0;
+					left: 0;
+					width: 100%;
+					height: 100%;
+					background: rgba(0, 0, 0, 0.5);
+					z-index: 10000;
+					display: flex;
+					align-items: center;
+					justify-content: center;
+					backdrop-filter: blur(4px);
+					animation: fadeIn 0.2s ease;
+				`;
+
+				const modal = document.createElement("div");
+				modal.style.cssText = `
+					background: linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(248, 252, 248, 0.95));
+					border-radius: 24px;
+					padding: 32px;
+					max-width: 480px;
+					width: 90%;
+					box-shadow: 0 24px 70px rgba(19, 34, 24, 0.2);
+					animation: slideUp 0.3s ease;
+					border: 1px solid rgba(23, 79, 35, 0.12);
+				`;
+
+				const fileCount = imageFiles.length;
+				const fileWord = fileCount === 1 ? 'image' : 'images';
+				
+				modal.innerHTML = `
+					<style>
+						@keyframes fadeIn {
+							from { opacity: 0; }
+							to { opacity: 1; }
+						}
+						@keyframes slideUp {
+							from { opacity: 0; transform: translateY(20px); }
+							to { opacity: 1; transform: translateY(0); }
+						}
+					</style>
+					<div style="text-align: center; margin-bottom: 24px;">
+						<div style="
+							width: 64px;
+							height: 64px;
+							margin: 0 auto 16px;
+							border-radius: 20px;
+							background: linear-gradient(135deg, rgba(223, 244, 225, 0.95), rgba(255, 250, 240, 0.9));
+							display: flex;
+							align-items: center;
+							justify-content: center;
+							color: var(--green);
+						">
+							<svg viewBox="0 0 24 24" width="32" height="32" fill="none" stroke="currentColor" stroke-width="2">
+								<rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+								<circle cx="8.5" cy="8.5" r="1.5"></circle>
+								<polyline points="21 15 16 10 5 21"></polyline>
+							</svg>
+						</div>
+						<h3 style="
+							font-size: 20px;
+							font-weight: 900;
+							color: var(--green);
+							margin-bottom: 12px;
+						">Image ${fileCount === 1 ? 'File' : 'Files'} Detected</h3>
+						<p style="
+							font-size: 14px;
+							line-height: 1.6;
+							color: var(--muted);
+							margin-bottom: 8px;
+						">You've uploaded ${fileCount} ${fileWord}. How would you like to process ${fileCount === 1 ? 'it' : 'them'}?</p>
+					</div>
+					<div style="display: grid; gap: 12px;">
+						<button id="compress-image-btn" style="
+							width: 100%;
+							padding: 16px;
+							border: 0;
+							border-radius: 16px;
+							font-size: 14px;
+							font-weight: 800;
+							color: white;
+							background: linear-gradient(135deg, #1b5e20, #388e3c 58%, #56a869);
+							cursor: pointer;
+							box-shadow: 0 12px 28px rgba(23, 79, 35, 0.2);
+							transition: all 0.2s ease;
+						" onmouseover="this.style.transform='translateY(-2px)'; this.style.boxShadow='0 16px 32px rgba(23, 79, 35, 0.28)'" onmouseout="this.style.transform=''; this.style.boxShadow='0 12px 28px rgba(23, 79, 35, 0.2)'">
+							<div style="display: flex; align-items: center; justify-content: center; gap: 8px;">
+								<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
+									<rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+									<circle cx="8.5" cy="8.5" r="1.5"></circle>
+									<polyline points="21 15 16 10 5 21"></polyline>
+								</svg>
+								<span>Compress as Image</span>
+							</div>
+							<div style="font-size: 11px; font-weight: 600; margin-top: 4px; opacity: 0.9;">Keep original format (JPEG, PNG, etc.)</div>
+						</button>
+						<button id="convert-pdf-btn" style="
+							width: 100%;
+							padding: 16px;
+							border: 1px solid rgba(23, 79, 35, 0.14);
+							border-radius: 16px;
+							font-size: 14px;
+							font-weight: 800;
+							color: var(--green);
+							background: rgba(255, 255, 255, 0.9);
+							cursor: pointer;
+							box-shadow: 0 12px 28px rgba(25, 39, 27, 0.06);
+							transition: all 0.2s ease;
+						" onmouseover="this.style.transform='translateY(-2px)'; this.style.background='rgba(255, 255, 255, 1)'" onmouseout="this.style.transform=''; this.style.background='rgba(255, 255, 255, 0.9)'">
+							<div style="display: flex; align-items: center; justify-content: center; gap: 8px;">
+								<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
+									<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+									<polyline points="14 2 14 8 20 8"></polyline>
+								</svg>
+								<span>Convert & Compress as PDF</span>
+							</div>
+							<div style="font-size: 11px; font-weight: 600; margin-top: 4px; color: var(--muted);">Convert to PDF format</div>
+						</button>
+					</div>
+				`;
+
+				overlay.appendChild(modal);
+				document.body.appendChild(overlay);
+
+				modal.querySelector("#compress-image-btn").addEventListener("click", () => {
+					document.body.removeChild(overlay);
+					resolve("image");
+				});
+
+				modal.querySelector("#convert-pdf-btn").addEventListener("click", () => {
+					document.body.removeChild(overlay);
+					resolve("pdf");
+				});
+			});
+		}
+
+		async function handleSelectedFiles(files, options = {}) {
+			const { append = false } = options;
+			const accepted = [];
+			const imageFiles = [];
+			
+			for (const file of files) {
+				const allowedInCurrentMode = state.mode === "merge"
+					? (isPdfFile(file) || isImageFile(file))
+					: isSupportedFile(file);
+
+				if (!allowedInCurrentMode) continue;
+				if (isImageFile(file)) {
+					try {
+						const bitmap = await createImageBitmap(file);
+						bitmap.close();
+						imageFiles.push(file);
+					} catch (error) {
+						continue;
+					}
+				}
+				accepted.push(file);
+			}
+
+			if (!accepted.length) {
+				showError(state.mode === "merge"
+					? "No supported local PDF or image files were selected."
+					: "No supported local PDF, image, or text files were selected.");
+				return;
+			}
+
+			// Ask user preference if images are detected (only in compress mode)
+			if (imageFiles.length > 0 && state.mode === "compress") {
+				const preference = await askImageConversionPreference(imageFiles);
+				
+				// Store the preference in ALL accepted files (to ensure it persists)
+				for (const file of accepted) {
+					if (imageFiles.includes(file)) {
+						file.userPreference = preference;
+					}
+				}
+			}
+
+			state.files = append ? mergeUniqueFiles(state.files, accepted) : accepted;
+			state.results = [];
+			setDropFileView();
+			hideSections();
+			$("action-section").classList.add("visible");
+			updateCompressButton();
+		}
+
+		function setMode(mode) {
+			if (state.mode === mode) return;
+			state.mode = mode;
+			updateModeUI();
+			resetState();
+		}
+
+		$("info-btn").addEventListener("click", () => {
+			const isOpen = $("info-banner").classList.toggle("open");
+			$("info-btn").setAttribute("aria-expanded", String(isOpen));
+		});
+
+		$("info-close").addEventListener("click", () => {
+			$("info-banner").classList.remove("open");
+			$("info-btn").setAttribute("aria-expanded", "false");
+		});
+
+		$("drop-zone").addEventListener("click", (event) => {
+			if (!event.target.closest("#remove-file")) {
+				$("file-input").click();
+			}
+		});
+
+		$("drop-zone").addEventListener("keydown", (event) => {
+			if (event.key === "Enter" || event.key === " ") {
+				event.preventDefault();
+				$("file-input").click();
+			}
+		});
+
+		$("drop-zone").addEventListener("dragover", (event) => {
+			event.preventDefault();
+			$("drop-zone").classList.add("drag-over");
+			$("drop-title").textContent = state.mode === "merge"
+				? "Drop PDFs or images here"
+				: "Drop PDFs, images, or text files here";
+		});
+
+		$("drop-zone").addEventListener("dragleave", () => {
+			$("drop-zone").classList.remove("drag-over");
+			$("drop-title").textContent = state.mode === "merge"
+				? "Drag & drop files to merge"
+				: "Drag & drop PDFs, images, or text files";
+		});
+
+		$("drop-zone").addEventListener("drop", (event) => {
+			event.preventDefault();
+			$("drop-zone").classList.remove("drag-over");
+			$("drop-title").textContent = state.mode === "merge"
+				? "Drag & drop files to merge"
+				: "Drag & drop PDFs, images, or text files";
+			const files = Array.from(event.dataTransfer.files || []);
+			if (files.length) handleSelectedFiles(files);
+		});
+
+		$("file-input").addEventListener("change", (event) => {
+			const files = Array.from(event.target.files || []);
+			if (files.length) {
+				handleSelectedFiles(files, { append: state.appendSelection });
+			}
+			state.appendSelection = false;
+			event.target.value = "";
+		});
+
+		$("add-files-btn").addEventListener("click", (event) => {
+			event.stopPropagation();
+			state.appendSelection = true;
+			$("file-input").click();
+		});
+
+		$("remove-file").addEventListener("click", (event) => {
+			event.stopPropagation();
+			resetState();
+		});
+
+		document.querySelectorAll(".mode-tab").forEach((button) => {
+			button.addEventListener("click", () => {
+				setMode(button.dataset.mode);
+			});
+		});
+
+		$("compress-btn").addEventListener("click", handleCompression);
+		$("retry-btn").addEventListener("click", resetState);
+		$("reset-btn").addEventListener("click", resetState);
+
+		createParticles();
+		updateModeUI();
+		loadCodecs();
+	</script>
+</body>
+</html>
+
