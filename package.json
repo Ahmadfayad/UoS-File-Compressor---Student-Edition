@@ -1,0 +1,23 @@
+{
+  "name": "uos-file-compressor",
+  "version": "1.0.0",
+  "description": "UoS File Compressor - Student Edition",
+  "main": "index.html",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Ahmadfayad/UoS-File-Compressor---Student-Edition.git"
+  },
+  "keywords": ["file", "compressor", "pdf", "image"],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/Ahmadfayad/UoS-File-Compressor---Student-Edition/issues"
+  },
+  "homepage": "https://github.com/Ahmadfayad/UoS-File-Compressor---Student-Edition#readme",
+  "dependencies": {
+    "@vercel/analytics": "^2.0.1"
+  }
+}
