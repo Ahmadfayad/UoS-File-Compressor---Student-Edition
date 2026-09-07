@@ -3,6 +3,10 @@
 <head>
 	<meta charset="UTF-8" />
 	<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+	<meta name="color-scheme" content="light" />
+	<meta name="theme-color" content="#174f23" />
+	<link rel="preconnect" href="https://fonts.googleapis.com" />
+	<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 	<title>UoS File Compressor</title>
 
 	<script src="https://cdn.jsdelivr.net/npm/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
@@ -35,6 +39,7 @@
 
 		body {
 			min-height: 100vh;
+			min-height: 100dvh;
 			font-family: "Plus Jakarta Sans", "Segoe UI", -apple-system, BlinkMacSystemFont, sans-serif;
 			color: var(--text);
 			background:
@@ -46,6 +51,7 @@
 
 		.page {
 			min-height: 100vh;
+			min-height: 100dvh;
 			display: flex;
 			flex-direction: column;
 			position: relative;
@@ -119,7 +125,7 @@
 		}
 
 		.header-inner {
-			min-height: 88px;
+			min-height: 72px;
 			display: flex;
 			align-items: center;
 			justify-content: space-between;
@@ -135,7 +141,7 @@
 		}
 
 		.brand img {
-			height: 66px;
+			height: 52px;
 			width: auto;
 			object-fit: contain;
 			display: block;
@@ -196,6 +202,14 @@
 			box-shadow: 0 12px 28px rgba(29, 43, 31, 0.09);
 		}
 
+		.icon-btn:focus-visible,
+		.primary-btn:focus-visible,
+		.secondary-btn:focus-visible,
+		.mode-tab:focus-visible {
+			outline: 2px solid var(--green-soft);
+			outline-offset: 2px;
+		}
+
 		#info-banner {
 			overflow: hidden;
 			max-height: 0;
@@ -233,17 +247,21 @@
 			width: 100%;
 			max-width: 820px;
 			margin: 0 auto;
-			padding: 44px 20px 34px;
+			padding: 28px 20px 24px;
 			flex: 1;
+			display: flex;
+			flex-direction: column;
+			justify-content: center;
+			min-height: calc(100dvh - 160px);
 		}
 
 		.title {
 			text-align: center;
-			margin-bottom: 24px;
+			margin-bottom: 16px;
 			display: flex;
 			flex-direction: column;
 			align-items: center;
-			gap: 10px;
+			gap: 8px;
 		}
 
 		.title-badge {
@@ -275,16 +293,19 @@
 			font-size: 14px;
 			line-height: 1.6;
 			color: var(--muted);
+			text-wrap: pretty;
 		}
 
 		.mode-switch {
 			display: grid;
-			justify-items: center;
+			justify-items: stretch;
 			gap: 10px;
-			margin: 0 auto 24px;
+			width: 100%;
+			margin: 0 auto 18px;
 		}
 
 		.mode-switch-label {
+			text-align: center;
 			font-size: 11px;
 			font-weight: 800;
 			letter-spacing: 0.12em;
@@ -293,11 +314,11 @@
 		}
 
 		.mode-tabs {
-			display: flex;
-			align-items: center;
-			justify-content: center;
-			gap: 0;
-			width: fit-content;
+			display: grid;
+			grid-template-columns: repeat(4, minmax(0, 1fr));
+			align-items: stretch;
+			gap: 4px;
+			width: 100%;
 			max-width: 100%;
 			padding: 8px;
 			border-radius: 24px;
@@ -311,9 +332,9 @@
 			border: 0;
 			background: transparent;
 			color: var(--muted);
-			min-width: 188px;
-			padding: 14px 18px;
-			border-radius: 18px;
+			min-width: 0;
+			padding: 12px 10px;
+			border-radius: 16px;
 			font-size: 13px;
 			font-weight: 800;
 			cursor: pointer;
@@ -322,6 +343,7 @@
 			text-align: left;
 			display: grid;
 			gap: 4px;
+			overflow: hidden;
 		}
 
 		.mode-tab-title {
@@ -341,10 +363,18 @@
 		}
 
 		.mode-tab-copy {
-			font-size: 11px;
+			font-size: 10px;
 			font-weight: 700;
 			line-height: 1.35;
 			color: rgba(57, 79, 60, 0.74);
+			opacity: 0.85;
+			white-space: normal;
+			overflow: hidden;
+			text-overflow: ellipsis;
+			display: -webkit-box;
+			-webkit-line-clamp: 2;
+			line-clamp: 2;
+			-webkit-box-orient: vertical;
 		}
 
 		.mode-tab:hover {
@@ -376,10 +406,10 @@
 			box-shadow:
 				0 24px 70px rgba(19, 34, 24, 0.08),
 				inset 0 1px 0 rgba(255, 255, 255, 0.72);
-			border-radius: 32px;
-			padding: clamp(22px, 4vw, 36px);
+			border-radius: 26px;
+			padding: clamp(16px, 3vw, 26px);
 			position: relative;
-			overflow: hidden;
+			overflow: visible;
 			width: 100%;
 		}
 
@@ -387,6 +417,7 @@
 			content: "";
 			position: absolute;
 			inset: 0;
+			border-radius: inherit;
 			background: linear-gradient(135deg, rgba(98, 180, 109, 0.06), transparent 36%, rgba(197, 150, 12, 0.05));
 			pointer-events: none;
 		}
@@ -596,14 +627,14 @@
 
 		.section {
 			display: none;
-			margin-top: 26px;
-			animation: slideUp 0.3s ease-out forwards;
+			margin-top: 18px;
+			animation: fadeIn 0.3s ease-out forwards;
 		}
 
 		.section.visible { display: block; }
 
-		@keyframes slideUp {
-			from { opacity: 0; transform: translateY(10px); }
+		@keyframes fadeIn {
+			from { opacity: 0; transform: translateY(8px); }
 			to { opacity: 1; transform: translateY(0); }
 		}
 
@@ -688,12 +719,30 @@
 
 		.level-btn.active span:last-child { color: var(--green); }
 
+		#format-buttons {
+			display: grid;
+			grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+			gap: 10px;
+		}
+
 		.level-desc {
 			margin-top: 14px;
 			font-size: 12px;
 			color: var(--muted);
 			text-align: center;
 			line-height: 1.7;
+		}
+
+		#transparency-warning {
+			margin-top: 12px;
+			padding: 10px 14px;
+			border-radius: 10px;
+			background: rgba(197, 150, 12, 0.12);
+			border: 1px solid rgba(197, 150, 12, 0.24);
+			font-size: 12px;
+			font-weight: 600;
+			color: var(--gold);
+			text-align: center;
 		}
 
 		.primary-btn,
@@ -1110,12 +1159,12 @@
 
 			main {
 				max-width: 760px;
-				padding: 34px 18px 28px;
+				padding: 24px 18px 20px;
 			}
 
 			.card {
-				border-radius: 28px;
-				padding: 22px;
+				border-radius: 24px;
+				padding: 18px;
 			}
 
 			.title h2 {
@@ -1137,13 +1186,17 @@
 				width: 100%;
 				max-width: 860px;
 				display: grid;
-				grid-template-columns: repeat(3, minmax(0, 1fr));
+				grid-template-columns: repeat(4, minmax(0, 1fr));
 				align-items: stretch;
 			}
 
 			.mode-tab {
 				min-width: 0;
 				padding: 13px 16px;
+			}
+
+			.mode-tab-copy {
+				display: none;
 			}
 
 			.selection-header {
@@ -1207,31 +1260,39 @@
 			}
 
 			.mode-switch-label {
-				text-align: left;
 				font-size: 10px;
 			}
 
 			.mode-tabs {
-				grid-template-columns: repeat(3, minmax(0, 1fr));
-				padding: 5px;
-				border-radius: 18px;
-				gap: 5px;
+				grid-template-columns: 1fr;
+				padding: 6px;
+				border-radius: 20px;
+				gap: 6px;
 				box-shadow: 0 12px 24px rgba(25, 39, 27, 0.06);
 			}
 
 			.mode-tab {
-				padding: 11px 10px;
+				min-height: 56px;
+				padding: 12px 14px;
 				border-radius: 14px;
-				text-align: center;
-				gap: 0;
+				text-align: left;
+				gap: 2px;
+				border: 1px solid transparent;
+			}
+
+			.mode-tab:not(.active) {
+				border-color: rgba(23, 79, 35, 0.08);
+				background: rgba(255, 255, 255, 0.55);
 			}
 
 			.mode-tab-title {
-				justify-content: center;
+				justify-content: flex-start;
 			}
 
 			.mode-tab-copy {
-				display: none;
+				display: block;
+				-webkit-line-clamp: 1;
+				line-clamp: 1;
 			}
 
 			.card {
@@ -1396,7 +1457,7 @@
 		}
 
 		.footer-inner {
-			min-height: 64px;
+			min-height: 48px;
 			display: flex;
 			align-items: center;
 			justify-content: center;
@@ -1747,7 +1808,7 @@
 		<header>
 			<div class="header-inner">
 				<div class="brand">
-					<img src="https://files.catbox.moe/nse05j.png" alt="University of Sharjah logo" />
+					<img src="https://files.catbox.moe/nse05j.png" alt="University of Sharjah logo" fetchpriority="high" decoding="async" />
 				</div>
 
 				<div class="header-actions">
@@ -1797,6 +1858,10 @@
 					<button class="mode-tab" id="split-tab" data-mode="split" role="tab" aria-selected="false">
 						<span class="mode-tab-title"><span class="mode-tab-dot"></span><span>Split</span></span>
 						<span class="mode-tab-copy">Extract pages from a PDF — preview, pick, download</span>
+					</button>
+					<button class="mode-tab" id="convert-tab" data-mode="convert" role="tab" aria-selected="false">
+						<span class="mode-tab-title"><span class="mode-tab-dot"></span><span>Convert</span></span>
+						<span class="mode-tab-copy">Change formats (JPG, PNG, WEBP, PDF)</span>
 					</button>
 				</div>
 			</div>
@@ -1883,6 +1948,31 @@
 						</div>
 					</div>
 
+				</div>
+
+				<div class="section" id="convert-format-section" hidden>
+					<div class="section-label">Convert to</div>
+					<div class="level-buttons" id="format-buttons">
+						<button class="level-btn active" data-format="image/jpeg" type="button">
+							<span>JPG</span>
+							<span>Best for photos</span>
+						</button>
+						<button class="level-btn" data-format="image/png" type="button">
+							<span>PNG</span>
+							<span>Best for quality</span>
+						</button>
+						<button class="level-btn" data-format="image/webp" type="button">
+							<span>WEBP</span>
+							<span>Modern & small</span>
+						</button>
+						<button class="level-btn" data-format="application/pdf" type="button">
+							<span>PDF</span>
+							<span>Document format</span>
+						</button>
+					</div>
+					<div id="transparency-warning" class="level-desc" hidden>
+						⚠️ Your image has transparency. JPG will fill it with white.
+					</div>
 				</div>
 
 				<div class="section" id="action-section">
@@ -2050,12 +2140,25 @@
 				maxFiles: 1,
 				acceptedTypes: ["application/pdf"],
 			},
+			convert: {
+				title: "Convert & compress images or PDFs.",
+				subtitle: "Change image formats, or turn PDF pages into images — optimized to under 1MB.",
+				dropTitle: "Drag & drop images or PDFs to convert",
+				dropSubtitle: "or click to browse",
+				selectionLabel: "Files to Convert",
+				actionSingle: "Convert File",
+				actionMany: "Convert Files",
+				resultTitle: "Conversion Complete",
+				resultNote: "Converted and compressed locally. Save each file.",
+				minFiles: 1,
+			},
 		};
 
 		const state = {
 			files: [],
 			results: [],
 			mode: "compress",
+			convertFormat: "image/jpeg",
 			appendSelection: false,
 			codecs: {
 				jpeg: null,
@@ -2137,6 +2240,19 @@
 			return isPdfFile(file) || isImageFile(file) || isTextFile(file);
 		}
 
+		/** Browsers don't all support TIFF/HEIC decoding; probe before trusting the file. */
+		async function canDecodeImage(file) {
+			let bitmap = null;
+			try {
+				bitmap = await createImageBitmap(file);
+				return true;
+			} catch (error) {
+				return false;
+			} finally {
+				if (bitmap) bitmap.close();
+			}
+		}
+
 		function hasMeaningfulSavings(originalSize, compressedSize) {
 			if (!originalSize || compressedSize >= originalSize) return false;
 			return ((originalSize - compressedSize) / originalSize) >= MIN_MEANINGFUL_SAVINGS_RATIO;
@@ -2208,6 +2324,12 @@
 			}
 
 			$("add-files-btn").classList.toggle("visible", state.mode === "merge");
+			refreshConvertFormatUI();
+
+			// Convert mode accepts images and PDFs; other modes keep the default broad accept list.
+			const defaultAccept = ".jpg,.jpeg,.png,.webp,.avif,.gif,.bmp,.tif,.tiff,.heic,.heif,.pdf,.html,.htm,.txt,.json,.css,.js,.xml,.csv,.md,.svg";
+			const convertAccept = ".jpg,.jpeg,.png,.webp,.avif,.gif,.bmp,.tif,.tiff,.heic,.heif,.pdf";
+			$("file-input").setAttribute("accept", state.mode === "convert" ? convertAccept : defaultAccept);
 
 			// Update accepted file type chips for current mode
 			const typeList = $("drop-empty").querySelector(".type-list");
@@ -2224,6 +2346,24 @@
 				button.classList.toggle("active", active);
 				button.setAttribute("aria-selected", String(active));
 			});
+		}
+
+		/** Show the format picker only once files are selected in Convert mode, and warn about transparency loss. */
+		function refreshConvertFormatUI() {
+			const showSection = state.mode === "convert" && state.files.length > 0;
+			// #convert-format-section carries the .section class, which is display:none until .visible is applied.
+			$("convert-format-section").classList.toggle("visible", showSection);
+			if (!showSection) {
+				$("transparency-warning").hidden = true;
+				return;
+			}
+			const transparencyProneExts = new Set(["png", "webp", "gif"]);
+			const mayHaveTransparency = state.files.some((file) => {
+				if (!isImageFile(file)) return false;
+				if (file.type === "image/png" || file.type === "image/webp" || file.type === "image/gif") return true;
+				return transparencyProneExts.has(getFileExtension(file.name));
+			});
+			$("transparency-warning").hidden = !(state.convertFormat === "image/jpeg" && mayHaveTransparency);
 		}
 
 		function updateCompressButton() {
@@ -2627,109 +2767,399 @@
 		async function compressImage(file, levelKey, onProgress) {
 			const level = LEVELS[levelKey];
 			const originalSize = file.size;
-			const bitmap = await createImageBitmap(file);
 			const baseName = file.name.replace(/\.[^.]+$/, "");
-			const profile = analyzeImageProfile(bitmap);
-			const originalIsPng = file.type === "image/png";
-			const strategy = getImageStrategy(file, profile);
+			let bitmap = null;
 
-			onProgress("Loading image…", 10);
+			try {
+				bitmap = await createImageBitmap(file);
 
-			if (originalSize <= TARGET_MAX && originalIsPng) {
-				onProgress("Trying lossless PNG optimization…", 30);
-				const losslessBlob = await optimisePngLossless(file);
-				if (losslessBlob) {
+				// Guard against Canvas/GPU OOM on extreme-resolution images by capping the longest side.
+				const MAX_SAFE_PIXELS = 40000000;
+				const MAX_SAFE_DIMENSION = 4096;
+				if (bitmap.width * bitmap.height > MAX_SAFE_PIXELS) {
+					const scale = Math.min(MAX_SAFE_DIMENSION / bitmap.width, MAX_SAFE_DIMENSION / bitmap.height, 1);
+					const safeWidth = Math.max(1, Math.round(bitmap.width * scale));
+					const safeHeight = Math.max(1, Math.round(bitmap.height * scale));
+					const resizedBitmap = await createImageBitmap(bitmap, {
+						resizeWidth: safeWidth,
+						resizeHeight: safeHeight,
+						resizeQuality: "high",
+					});
 					bitmap.close();
-					return makeResult(losslessBlob, `${baseName}_compressed.png`, "image/png", originalSize, state.codecs.label);
-				}
-			}
-
-			const outputType = strategy.type;
-			const outputName = `${baseName}_compressed${strategy.extension}`;
-
-			if (originalSize <= TARGET_MAX) {
-				onProgress(`Applying light optimization…`, 42);
-				let lightBlob;
-				if (outputType === "image/png") {
-					lightBlob = await encodeOriginalType(bitmap, bitmap.width, bitmap.height, outputType, 1);
-				} else {
-					const quality = Math.min(strategy.maxQuality, Math.max(level.startQuality, strategy.minQuality, 0.9));
-					lightBlob = await encodeLossy(bitmap, bitmap.width, bitmap.height, outputType, quality);
+					bitmap = resizedBitmap;
 				}
 
-				let bestSmallBlob = lightBlob;
-				if (lightBlob.size >= originalSize && (outputType === "image/jpeg" || outputType === "image/webp")) {
-					onProgress("Trying stronger optimization…", 58);
-					const fallbackQualities = [0.86, 0.8, 0.74, 0.68]
-						.map((value) => Math.max(strategy.minQuality, Math.min(strategy.maxQuality, value)));
-					for (const quality of fallbackQualities) {
-						const candidate = await encodeLossy(bitmap, bitmap.width, bitmap.height, outputType, quality);
-						if (candidate.size < bestSmallBlob.size) {
-							bestSmallBlob = candidate;
+				const profile = analyzeImageProfile(bitmap);
+				const originalIsPng = file.type === "image/png";
+				const strategy = getImageStrategy(file, profile);
+
+				onProgress("Loading image…", 10);
+
+				if (originalSize <= TARGET_MAX && originalIsPng) {
+					onProgress("Trying lossless PNG optimization…", 30);
+					const losslessBlob = await optimisePngLossless(file);
+					if (losslessBlob) {
+						return makeResult(losslessBlob, `${baseName}_compressed.png`, "image/png", originalSize, state.codecs.label);
+					}
+				}
+
+				const outputType = strategy.type;
+				const outputName = `${baseName}_compressed${strategy.extension}`;
+
+				if (originalSize <= TARGET_MAX) {
+					onProgress(`Applying light optimization…`, 42);
+					let lightBlob;
+					if (outputType === "image/png") {
+						lightBlob = await encodeOriginalType(bitmap, bitmap.width, bitmap.height, outputType, 1);
+					} else {
+						const quality = Math.min(strategy.maxQuality, Math.max(level.startQuality, strategy.minQuality, 0.9));
+						lightBlob = await encodeLossy(bitmap, bitmap.width, bitmap.height, outputType, quality);
+					}
+
+					let bestSmallBlob = lightBlob;
+					if (lightBlob.size >= originalSize && (outputType === "image/jpeg" || outputType === "image/webp")) {
+						onProgress("Trying stronger optimization…", 58);
+						const fallbackQualities = [0.86, 0.8, 0.74, 0.68]
+							.map((value) => Math.max(strategy.minQuality, Math.min(strategy.maxQuality, value)));
+						for (const quality of fallbackQualities) {
+							const candidate = await encodeLossy(bitmap, bitmap.width, bitmap.height, outputType, quality);
+							if (candidate.size < bestSmallBlob.size) {
+								bestSmallBlob = candidate;
+							}
+							if (bestSmallBlob.size < originalSize) {
+								break;
+							}
 						}
-						if (bestSmallBlob.size < originalSize) {
+					}
+
+					const finalBlob = bestSmallBlob.size < originalSize ? bestSmallBlob : file;
+					return makeResult(finalBlob, outputName, outputType, originalSize, state.codecs.label);
+				}
+
+				onProgress(`Searching best quality…`, 20);
+
+				let bestBlob = null;
+				if (outputType === "image/jpeg" || outputType === "image/webp") {
+					bestBlob = await binarySearchLossy(
+						bitmap,
+						bitmap.width,
+						bitmap.height,
+						originalSize,
+						level.aim,
+						outputType,
+						strategy.minQuality,
+						strategy.maxQuality
+					);
+				} else {
+					const pngBlob = await encodeOriginalType(bitmap, bitmap.width, bitmap.height, outputType, level.startQuality);
+					if (pngBlob.size <= TARGET_MAX) {
+						bestBlob = pngBlob;
+					}
+				}
+
+				if (!bestBlob || !isWithinTarget(bestBlob.size, originalSize)) {
+					const scales = [0.9, 0.78, 0.65, 0.52, 0.42, 0.32, 0.24];
+					for (let index = 0; index < scales.length; index += 1) {
+						const scale = scales[index];
+						const maxDimension = level.maxDimension * scale;
+						const ratio = Math.min(maxDimension / bitmap.width, maxDimension / bitmap.height, 1);
+						const width = Math.max(1, Math.round(bitmap.width * ratio));
+						const height = Math.max(1, Math.round(bitmap.height * ratio));
+						onProgress(`Scaling to ${width}×${height}…`, 32 + index * 12);
+
+						const scaledBlob = (outputType === "image/jpeg" || outputType === "image/webp")
+							? await binarySearchLossy(bitmap, width, height, originalSize, level.aim, outputType, strategy.minQuality, strategy.maxQuality)
+							: await encodeOriginalType(bitmap, width, height, outputType, 1);
+
+						if (scaledBlob && (!bestBlob || scaledBlob.size < bestBlob.size || isWithinTarget(scaledBlob.size, originalSize))) {
+							bestBlob = scaledBlob;
+						}
+
+						if (bestBlob && isWithinTarget(bestBlob.size, originalSize)) {
 							break;
 						}
 					}
 				}
 
-				bitmap.close();
-				const finalBlob = bestSmallBlob.size < originalSize ? bestSmallBlob : file;
-				return makeResult(finalBlob, outputName, outputType, originalSize, state.codecs.label);
+				if (!bestBlob) {
+					throw new Error("Unable to compress this image within the target constraints.");
+				}
+
+				return makeResult(bestBlob, outputName, outputType, originalSize, state.codecs.label);
+			} finally {
+				if (bitmap) bitmap.close();
 			}
+		}
 
-			onProgress(`Searching best quality…`, 20);
+		async function convertAndCompressImage(file, targetFormat = "image/jpeg", onProgress) {
+			const originalSize = file.size;
+			const baseName = file.name.replace(/\.[^.]+$/, "");
+			const extension = targetFormat === "image/png" ? ".png" : targetFormat === "image/webp" ? ".webp" : ".jpg";
+			const outputName = `${baseName}_converted${extension}`;
+			let bitmap = null;
 
-			let bestBlob = null;
-			if (outputType === "image/jpeg" || outputType === "image/webp") {
-				bestBlob = await binarySearchLossy(
-					bitmap,
-					bitmap.width,
-					bitmap.height,
-					originalSize,
-					level.aim,
-					outputType,
-					strategy.minQuality,
-					strategy.maxQuality
-				);
-			} else {
-				const pngBlob = await encodeOriginalType(bitmap, bitmap.width, bitmap.height, outputType, level.startQuality);
-				if (pngBlob.size <= TARGET_MAX) {
-					bestBlob = pngBlob;
+			try {
+				bitmap = await createImageBitmap(file);
+
+				// Guard against Canvas/GPU OOM on extreme-resolution images, same as compressImage.
+				const MAX_SAFE_PIXELS = 40000000;
+				const MAX_SAFE_DIMENSION = 4096;
+				if (bitmap.width * bitmap.height > MAX_SAFE_PIXELS) {
+					const scale = Math.min(MAX_SAFE_DIMENSION / bitmap.width, MAX_SAFE_DIMENSION / bitmap.height, 1);
+					const safeWidth = Math.max(1, Math.round(bitmap.width * scale));
+					const safeHeight = Math.max(1, Math.round(bitmap.height * scale));
+					const resizedBitmap = await createImageBitmap(bitmap, {
+						resizeWidth: safeWidth,
+						resizeHeight: safeHeight,
+						resizeQuality: "high",
+					});
+					bitmap.close();
+					bitmap = resizedBitmap;
+				}
+
+				onProgress("Analyzing image…", 15);
+				const profile = analyzeImageProfile(bitmap);
+				// JPEG has no alpha channel, so flatten transparency onto white first.
+				const needsWhiteBackground = targetFormat === "image/jpeg" && profile.hasAlpha;
+
+				const drawScaled = (width, height) => {
+					const { canvas: sourceCanvas } = drawBitmap(bitmap, width, height);
+					if (!needsWhiteBackground) return sourceCanvas;
+					const flattened = getCanvas(width, height);
+					const ctx = flattened.getContext("2d");
+					ctx.fillStyle = "#FFFFFF";
+					ctx.fillRect(0, 0, width, height);
+					ctx.drawImage(sourceCanvas, 0, 0);
+					return flattened;
+				};
+
+				const encodeAt = (width, height, quality) => canvasToBlob(drawScaled(width, height), targetFormat, quality);
+
+				const isLossy = targetFormat === "image/jpeg" || targetFormat === "image/webp";
+				const startQuality = isLossy ? MAX_JPEG_QUALITY : 1;
+
+				onProgress("Encoding…", 40);
+				let blob = await encodeAt(bitmap.width, bitmap.height, startQuality);
+
+				if (blob.size > TARGET_MAX && isLossy) {
+					onProgress("Compressing to fit size limit…", 55);
+					let low = MIN_JPEG_QUALITY;
+					let high = startQuality;
+					for (let i = 0; i < 8; i += 1) {
+						const mid = (low + high) / 2;
+						const candidate = await encodeAt(bitmap.width, bitmap.height, mid);
+						if (candidate.size <= TARGET_MAX) {
+							blob = candidate;
+							low = mid;
+						} else {
+							high = mid;
+						}
+					}
+				}
+
+				if (blob.size > TARGET_MAX) {
+					const scales = [0.85, 0.7, 0.55, 0.42, 0.32, 0.24, 0.18];
+					for (let index = 0; index < scales.length && blob.size > TARGET_MAX; index += 1) {
+						const scale = scales[index];
+						const width = Math.max(1, Math.round(bitmap.width * scale));
+						const height = Math.max(1, Math.round(bitmap.height * scale));
+						onProgress(`Scaling to ${width}×${height}…`, 70 + index * 4);
+						const candidate = await encodeAt(width, height, isLossy ? MIN_JPEG_QUALITY : 1);
+						if (candidate.size < blob.size) {
+							blob = candidate;
+						}
+					}
+				}
+
+				if (blob.size > TARGET_MAX) {
+					throw new Error("Unable to convert this image under the size limit.");
+				}
+
+				onProgress("Finalizing…", 95);
+				return makeResult(blob, outputName, targetFormat, originalSize, "Convert & Compress");
+			} finally {
+				if (bitmap) bitmap.close();
+			}
+		}
+
+		/** Renders one PDF.js page to an image blob, backing off scale/quality until it fits TARGET_MAX. Returns null if impossible. */
+		async function renderPdfPageToBlob(page, targetFormat) {
+			const isLossy = targetFormat === "image/jpeg" || targetFormat === "image/webp";
+			const scaleSteps = [2, 1.6, 1.3, 1, 0.8, 0.6, 0.45, 0.32];
+
+			for (const scale of scaleSteps) {
+				const viewport = page.getViewport({ scale });
+				const canvas = getCanvas(Math.max(1, Math.round(viewport.width)), Math.max(1, Math.round(viewport.height)), true);
+				const ctx = canvas.getContext("2d");
+				ctx.fillStyle = "#FFFFFF";
+				ctx.fillRect(0, 0, canvas.width, canvas.height);
+				await page.render({ canvasContext: ctx, viewport }).promise;
+
+				if (!isLossy) {
+					const candidate = await canvasToBlob(canvas, targetFormat, 1);
+					if (candidate.size <= TARGET_MAX) return candidate;
+					continue;
+				}
+
+				let low = MIN_JPEG_QUALITY;
+				let high = MAX_JPEG_QUALITY;
+				let best = null;
+				const highCandidate = await canvasToBlob(canvas, targetFormat, high);
+				if (highCandidate.size <= TARGET_MAX) {
+					best = highCandidate;
+					for (let i = 0; i < 6; i += 1) {
+						const mid = (low + high) / 2;
+						const midCandidate = await canvasToBlob(canvas, targetFormat, mid);
+						if (midCandidate.size <= TARGET_MAX) {
+							best = midCandidate;
+							low = mid;
+						} else {
+							high = mid;
+						}
+					}
+					return best;
 				}
 			}
 
-			if (!bestBlob || !isWithinTarget(bestBlob.size, originalSize)) {
-				const scales = [0.9, 0.78, 0.65, 0.52, 0.42, 0.32, 0.24];
-				for (let index = 0; index < scales.length; index += 1) {
-					const scale = scales[index];
-					const maxDimension = level.maxDimension * scale;
-					const ratio = Math.min(maxDimension / bitmap.width, maxDimension / bitmap.height, 1);
-					const width = Math.max(1, Math.round(bitmap.width * ratio));
-					const height = Math.max(1, Math.round(bitmap.height * ratio));
-					onProgress(`Scaling to ${width}×${height}…`, 32 + index * 12);
+			return null;
+		}
 
-					const scaledBlob = (outputType === "image/jpeg" || outputType === "image/webp")
-						? await binarySearchLossy(bitmap, width, height, originalSize, level.aim, outputType, strategy.minQuality, strategy.maxQuality)
-						: await encodeOriginalType(bitmap, width, height, outputType, 1);
+		/** PDF -> image(s). Multi-page PDFs return one result per page instead of a zip. */
+		async function convertPdfPagesToImages(file, targetFormat, onProgress) {
+			const originalSize = file.size;
+			const baseName = file.name.replace(/\.pdf$/i, "");
+			const extension = targetFormat === "image/png" ? ".png" : targetFormat === "image/webp" ? ".webp" : ".jpg";
 
-					if (scaledBlob && (!bestBlob || scaledBlob.size < bestBlob.size || isWithinTarget(scaledBlob.size, originalSize))) {
-						bestBlob = scaledBlob;
+			onProgress("Loading PDF…", 10);
+			const pdfjs = window.pdfjsLib;
+			pdfjs.GlobalWorkerOptions.workerSrc = "https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.js";
+			const buffer = await file.arrayBuffer();
+			const loadedPdf = await pdfjs.getDocument({ data: buffer.slice(0) }).promise;
+			const pageCount = loadedPdf.numPages;
+
+			const results = [];
+			for (let pageNumber = 1; pageNumber <= pageCount; pageNumber += 1) {
+				onProgress(`Converting page ${pageNumber}/${pageCount}…`, 10 + Math.round((pageNumber / pageCount) * 85));
+				const page = await loadedPdf.getPage(pageNumber);
+				const blob = await renderPdfPageToBlob(page, targetFormat);
+				if (!blob) {
+					throw new Error(`Unable to convert page ${pageNumber} under the size limit.`);
+				}
+				const pageName = pageCount === 1 ? `${baseName}${extension}` : `${baseName}_page${pageNumber}${extension}`;
+				results.push(makeResult(blob, pageName, targetFormat, originalSize, "PDF -> Image"));
+			}
+
+			onProgress("Finalizing…", 98);
+			return results;
+		}
+
+		/** Image -> single-page PDF, embedding PNG when transparency must be preserved, else JPEG. */
+		async function convertImageToPdf(file, onProgress) {
+			const originalSize = file.size;
+			const baseName = file.name.replace(/\.[^.]+$/, "");
+			let bitmap = null;
+
+			try {
+				bitmap = await createImageBitmap(file);
+
+				// Guard against Canvas/GPU OOM on extreme-resolution images, same as compressImage.
+				const MAX_SAFE_PIXELS = 40000000;
+				const MAX_SAFE_DIMENSION = 4096;
+				if (bitmap.width * bitmap.height > MAX_SAFE_PIXELS) {
+					const scale = Math.min(MAX_SAFE_DIMENSION / bitmap.width, MAX_SAFE_DIMENSION / bitmap.height, 1);
+					const safeWidth = Math.max(1, Math.round(bitmap.width * scale));
+					const safeHeight = Math.max(1, Math.round(bitmap.height * scale));
+					const resizedBitmap = await createImageBitmap(bitmap, {
+						resizeWidth: safeWidth,
+						resizeHeight: safeHeight,
+						resizeQuality: "high",
+					});
+					bitmap.close();
+					bitmap = resizedBitmap;
+				}
+
+				onProgress("Analyzing image…", 15);
+				const hasAlpha = analyzeImageProfile(bitmap).hasAlpha;
+
+				const buildPdfAt = async (width, height, quality) => {
+					const { canvas } = drawBitmap(bitmap, width, height, true);
+					const pdfDoc = await window.PDFLib.PDFDocument.create();
+					let embedded;
+					if (hasAlpha) {
+						const pngBuffer = await (await canvasToBlob(canvas, "image/png", 1)).arrayBuffer();
+						embedded = await pdfDoc.embedPng(pngBuffer);
+					} else {
+						const jpgBuffer = await (await canvasToBlob(canvas, "image/jpeg", quality)).arrayBuffer();
+						embedded = await pdfDoc.embedJpg(jpgBuffer);
 					}
+					const page = pdfDoc.addPage([width, height]);
+					page.drawImage(embedded, { x: 0, y: 0, width, height });
+					const pdfBytes = await pdfDoc.save({ useObjectStreams: true, addDefaultPage: false });
+					return new Blob([pdfBytes], { type: "application/pdf" });
+				};
 
-					if (bestBlob && isWithinTarget(bestBlob.size, originalSize)) {
-						break;
+				onProgress("Building PDF…", 40);
+				let pdfBlob = await buildPdfAt(bitmap.width, bitmap.height, MAX_JPEG_QUALITY);
+
+				if (pdfBlob.size > TARGET_MAX && !hasAlpha) {
+					onProgress("Compressing to fit size limit…", 55);
+					let low = MIN_JPEG_QUALITY;
+					let high = MAX_JPEG_QUALITY;
+					for (let i = 0; i < 8; i += 1) {
+						const mid = (low + high) / 2;
+						const candidate = await buildPdfAt(bitmap.width, bitmap.height, mid);
+						if (candidate.size <= TARGET_MAX) {
+							pdfBlob = candidate;
+							low = mid;
+						} else {
+							high = mid;
+						}
 					}
 				}
+
+				if (pdfBlob.size > TARGET_MAX) {
+					const scales = [0.85, 0.7, 0.55, 0.42, 0.32, 0.24, 0.18];
+					for (let index = 0; index < scales.length && pdfBlob.size > TARGET_MAX; index += 1) {
+						const scale = scales[index];
+						const width = Math.max(1, Math.round(bitmap.width * scale));
+						const height = Math.max(1, Math.round(bitmap.height * scale));
+						onProgress(`Scaling to ${width}×${height}…`, 70 + index * 4);
+						const candidate = await buildPdfAt(width, height, MIN_JPEG_QUALITY);
+						if (candidate.size < pdfBlob.size) {
+							pdfBlob = candidate;
+						}
+					}
+				}
+
+				if (pdfBlob.size > TARGET_MAX) {
+					throw new Error("Unable to convert this image to a PDF under the size limit.");
+				}
+
+				onProgress("Finalizing…", 95);
+				return makeResult(pdfBlob, `${baseName}.pdf`, "application/pdf", originalSize, "Image -> PDF", true);
+			} finally {
+				if (bitmap) bitmap.close();
+			}
+		}
+
+		/** Single entry point for Convert mode: routes to the right conversion path and always enforces TARGET_MAX. */
+		async function convertFile(file, targetFormat, onProgress) {
+			if (isPdfFile(file)) {
+				if (targetFormat === "application/pdf") {
+					let result = await compressPdf(file, AUTO_LEVEL, onProgress);
+					if (result.compressedSize > TARGET_MAX) {
+						result = await buildGuaranteedFallbackPdf(file, onProgress);
+					}
+					return result;
+				}
+				return convertPdfPagesToImages(file, targetFormat, onProgress);
 			}
 
-			bitmap.close();
-
-			if (!bestBlob) {
-				throw new Error("Unable to compress this image within the target constraints.");
+			if (targetFormat === "application/pdf") {
+				return convertImageToPdf(file, onProgress);
 			}
 
-			return makeResult(bestBlob, outputName, outputType, originalSize, state.codecs.label);
+			return convertAndCompressImage(file, targetFormat, onProgress);
 		}
 
 		async function pdfHasReadableText(fileBuffer) {
@@ -3009,15 +3439,20 @@
 			};
 
 			if (isImageFile(file)) {
-				const bitmap = await createImageBitmap(file);
-				const pdf = await tryCanvasCandidates(async (maxDim) => {
-					const ratio = Math.min(maxDim / bitmap.width, maxDim / bitmap.height, 1);
-					const width = Math.max(1, Math.round(bitmap.width * ratio));
-					const height = Math.max(1, Math.round(bitmap.height * ratio));
-					const { canvas } = drawBitmap(bitmap, width, height, true);
-					return { canvas, width, height };
-				});
-				bitmap.close();
+				let bitmap = null;
+				let pdf = null;
+				try {
+					bitmap = await createImageBitmap(file);
+					pdf = await tryCanvasCandidates(async (maxDim) => {
+						const ratio = Math.min(maxDim / bitmap.width, maxDim / bitmap.height, 1);
+						const width = Math.max(1, Math.round(bitmap.width * ratio));
+						const height = Math.max(1, Math.round(bitmap.height * ratio));
+						const { canvas } = drawBitmap(bitmap, width, height, true);
+						return { canvas, width, height };
+					});
+				} finally {
+					if (bitmap) bitmap.close();
+				}
 				if (pdf) {
 					return makeResult(pdf, `${baseName}_compressed.pdf`, "application/pdf", originalSize, "Guaranteed fallback", true);
 				}
@@ -3126,6 +3561,7 @@
 			return lines;
 		}
 
+		// Deprecated: no longer called for text files; rasterizing text destroys searchability.
 		async function textToLowDpiPdf(text, baseName, originalSize, onProgress) {
 			if (!window.PDFLib?.PDFDocument) {
 				throw new Error("PDF engine is not available for text fallback conversion.");
@@ -3247,63 +3683,67 @@
 		}
 
 		async function imageToLowDpiPdf(file, onProgress) {
-			const bitmap = await createImageBitmap(file);
-			const baseName = file.name.replace(/\.[^.]+$/, "");
-			const originalSize = file.size;
-			const cap = getEffectiveCap(originalSize);
+			let bitmap = null;
+			try {
+				bitmap = await createImageBitmap(file);
+				const baseName = file.name.replace(/\.[^.]+$/, "");
+				const originalSize = file.size;
+				const cap = getEffectiveCap(originalSize);
 
-			onProgress("Applying fallback: JPG rasterization…", 78);
+				onProgress("Applying fallback: JPG rasterization…", 78);
 
-			const attempts = [
-				{ maxDimension: 1400, quality: 0.62 },
-				{ maxDimension: 1650, quality: 0.7 },
-				{ maxDimension: 1900, quality: 0.77 },
-				{ maxDimension: 2200, quality: 0.84 },
-				{ maxDimension: 2550, quality: 0.9 },
-				{ maxDimension: 3000, quality: MAX_JPEG_QUALITY },
-			];
+				const attempts = [
+					{ maxDimension: 1400, quality: 0.62 },
+					{ maxDimension: 1650, quality: 0.7 },
+					{ maxDimension: 1900, quality: 0.77 },
+					{ maxDimension: 2200, quality: 0.84 },
+					{ maxDimension: 2550, quality: 0.9 },
+					{ maxDimension: 3000, quality: MAX_JPEG_QUALITY },
+				];
 
-			let bestBlob = null;
+				let bestBlob = null;
 
-			for (let attemptIndex = 0; attemptIndex < attempts.length; attemptIndex += 1) {
-				const attempt = attempts[attemptIndex];
-				onProgress(`Applying fallback: JPG rasterization (${attemptIndex + 1}/${attempts.length})…`, 78 + Math.round((attemptIndex / attempts.length) * 18));
+				for (let attemptIndex = 0; attemptIndex < attempts.length; attemptIndex += 1) {
+					const attempt = attempts[attemptIndex];
+					onProgress(`Applying fallback: JPG rasterization (${attemptIndex + 1}/${attempts.length})…`, 78 + Math.round((attemptIndex / attempts.length) * 18));
 
-				const ratio = Math.min(attempt.maxDimension / bitmap.width, attempt.maxDimension / bitmap.height, 1);
-				const width = Math.max(1, Math.round(bitmap.width * ratio));
-				const height = Math.max(1, Math.round(bitmap.height * ratio));
+					const ratio = Math.min(attempt.maxDimension / bitmap.width, attempt.maxDimension / bitmap.height, 1);
+					const width = Math.max(1, Math.round(bitmap.width * ratio));
+					const height = Math.max(1, Math.round(bitmap.height * ratio));
 
-				const { canvas } = drawBitmap(bitmap, width, height, true);
-				const pageImage = await canvasToBlob(canvas, "image/jpeg", attempt.quality);
-				const pageBuffer = await pageImage.arrayBuffer();
+					const { canvas } = drawBitmap(bitmap, width, height, true);
+					const pageImage = await canvasToBlob(canvas, "image/jpeg", attempt.quality);
+					const pageBuffer = await pageImage.arrayBuffer();
 
-				const pdfDoc = await window.PDFLib.PDFDocument.create();
-				const embedded = await pdfDoc.embedJpg(pageBuffer);
-				const page = pdfDoc.addPage([width, height]);
-				page.drawImage(embedded, { x: 0, y: 0, width, height });
+					const pdfDoc = await window.PDFLib.PDFDocument.create();
+					const embedded = await pdfDoc.embedJpg(pageBuffer);
+					const page = pdfDoc.addPage([width, height]);
+					page.drawImage(embedded, { x: 0, y: 0, width, height });
 
-				const pdfBytes = await pdfDoc.save({
-					useObjectStreams: true,
-					addDefaultPage: false,
-				});
+					const pdfBytes = await pdfDoc.save({
+						useObjectStreams: true,
+						addDefaultPage: false,
+					});
 
-				const candidate = new Blob([pdfBytes], { type: "application/pdf" });
-				if (candidate.size <= cap) {
-					if (!bestBlob || candidate.size > bestBlob.size) {
-						bestBlob = candidate;
-					}
-					if (isNearCap(candidate.size, cap)) {
-						break;
+					const candidate = new Blob([pdfBytes], { type: "application/pdf" });
+					if (candidate.size <= cap) {
+						if (!bestBlob || candidate.size > bestBlob.size) {
+							bestBlob = candidate;
+						}
+						if (isNearCap(candidate.size, cap)) {
+							break;
+						}
 					}
 				}
-			}
-			bitmap.close();
 
-			if (!bestBlob) {
-				throw new Error("Unable to create a cap-safe fallback PDF from image.");
-			}
+				if (!bestBlob) {
+					throw new Error("Unable to create a cap-safe fallback PDF from image.");
+				}
 
-			return makeResult(bestBlob, `${baseName}_lowdpi.pdf`, "application/pdf", originalSize, "JPG -> PDF (cap tuned)", true);
+				return makeResult(bestBlob, `${baseName}_lowdpi.pdf`, "application/pdf", originalSize, "JPG -> PDF (cap tuned)", true);
+			} finally {
+				if (bitmap) bitmap.close();
+			}
 		}
 
 		async function pdfToLowerDpiFallback(file, onProgress) {
@@ -3357,8 +3797,6 @@
 
 		async function compressTextFile(file, onProgress) {
 			const originalSize = file.size;
-			const baseName = file.name.replace(/\.[^.]+$/, "");
-			const extension = getFileExtension(file.name);
 
 			onProgress("Preparing text payload…", 24);
 			const sourceText = await file.text();
@@ -3379,14 +3817,12 @@
 				return makeResult(gzipBlobResult, `${file.name}.gz`, "application/gzip", originalSize, "GZIP");
 			}
 
-			onProgress("Applying aggressive fallback: image -> low DPI PDF…", 80);
-			const lowDpiPdfResult = await textToLowDpiPdf(normalizedText, baseName, originalSize, onProgress);
-			if (hasMeaningfulSavings(originalSize, lowDpiPdfResult.compressedSize)) {
-				return lowDpiPdfResult;
+			// GZIP gave no meaningful savings: keep the file as text rather than rasterizing it.
+			onProgress("GZIP savings negligible, keeping original text…", 80);
+			if (gzipBlobResult && gzipBlobResult.size < originalSize) {
+				return makeResult(gzipBlobResult, `${file.name}.gz`, "application/gzip", originalSize, "GZIP");
 			}
-
-			// User-requested forced fallback path when conventional compression is ineffective.
-			return lowDpiPdfResult;
+			return makeResult(sourceBlob, file.name, file.type || "text/plain", originalSize, "Stored (no rasterization)");
 		}
 
 		async function compressFile(file, levelKey, onProgress) {
@@ -3400,6 +3836,7 @@
 
 			const profile = await detectInternalFileProfile(file);
 			let result = null;
+			const isTextRoute = isTextFile(file) || profile.isTextLike || profile.isLikelyMarkup;
 
 			try {
 				if (isPdfFile(file)) {
@@ -3407,16 +3844,8 @@
 					if (result.compressedSize > TARGET_MAX || !hasMeaningfulSavings(file.size, result.compressedSize)) {
 						result = await pdfToLowerDpiFallback(file, onProgress);
 					}
-				} else if (isTextFile(file) || profile.isTextLike || profile.isLikelyMarkup) {
+				} else if (isTextRoute) {
 					result = await compressTextFile(file, onProgress);
-					if (result.compressedSize > TARGET_MAX) {
-						const normalizedText = await file.text();
-						result = await textToLowDpiPdf(normalizedText, file.name.replace(/\.[^.]+$/, ""), file.size, onProgress);
-					}
-					if (!hasMeaningfulSavings(file.size, result.compressedSize) && result.mime !== "application/pdf") {
-						const normalizedText = await file.text();
-						result = await textToLowDpiPdf(normalizedText, file.name.replace(/\.[^.]+$/, ""), file.size, onProgress);
-					}
 				} else if (isImageFile(file)) {
 					// Check if user explicitly wants to convert image to PDF
 					if (file.userPreference === "pdf") {
@@ -3444,8 +3873,9 @@
 				result = null;
 			}
 
-			// Only use fallback if result is null or too large AND user didn't explicitly choose PDF
-			if (!result || (result.compressedSize > TARGET_MAX && file.userPreference !== "pdf")) {
+			// Only use fallback if result is null or too large AND user didn't explicitly choose PDF.
+			// Text files are exempt from rasterized fallback to preserve searchability.
+			if (!result || (result.compressedSize > TARGET_MAX && file.userPreference !== "pdf" && !isTextRoute)) {
 				result = await buildGuaranteedFallbackPdf(file, onProgress);
 			}
 
@@ -3493,12 +3923,26 @@
 			$("progress-fill").style.width = "0%";
 			$("result-note").textContent = "";
 			hideSections();
+			refreshConvertFormatUI();
 			updateCompressButton();
 		}
 
 		function renderBatchResults() {
 			const container = $("results-list");
 			container.innerHTML = "";
+
+			if (state.results.length > 1) {
+				const downloadAllRow = document.createElement("div");
+				downloadAllRow.className = "result-item-actions";
+				downloadAllRow.style.marginBottom = "12px";
+				downloadAllRow.innerHTML = `
+					<button id="download-all-separate-btn" class="download-small-btn primary">Download All (Separate)</button>
+					<button id="download-all-zip-btn" class="download-small-btn primary">Download All (ZIP)</button>
+				`;
+				container.appendChild(downloadAllRow);
+				downloadAllRow.querySelector("#download-all-separate-btn").addEventListener("click", downloadAllStaggered);
+				downloadAllRow.querySelector("#download-all-zip-btn").addEventListener("click", downloadAllAsZip);
+			}
 
 			state.results.forEach((entry, index) => {
 				const row = document.createElement("div");
@@ -3548,6 +3992,66 @@
 			});
 		}
 
+		function downloadAllStaggered() {
+			const successful = state.results.filter((entry) => entry.result && !entry.error);
+
+			successful.forEach((entry, index) => {
+				setTimeout(() => {
+					const url = URL.createObjectURL(entry.result.blob);
+					const anchor = document.createElement("a");
+					anchor.href = url;
+					anchor.download = entry.result.fileName;
+					document.body.appendChild(anchor);
+					anchor.click();
+					document.body.removeChild(anchor);
+					setTimeout(() => URL.revokeObjectURL(url), 5_000);
+				}, index * 300);
+			});
+		}
+
+		async function downloadAllAsZip() {
+			const successful = state.results.filter((entry) => entry.result && !entry.error);
+			if (!successful.length) return;
+
+			const zipBtn = $("download-all-zip-btn");
+			if (zipBtn) {
+				zipBtn.disabled = true;
+				zipBtn.textContent = "Zipping…";
+			}
+
+			try {
+				const zip = new window.JSZip();
+				const usedNames = new Set();
+
+				successful.forEach((entry) => {
+					let name = entry.result.fileName || entry.file.name;
+					// Avoid collisions when multiple results share the same output name.
+					while (usedNames.has(name)) {
+						name = `_${name}`;
+					}
+					usedNames.add(name);
+					zip.file(name, entry.result.blob);
+				});
+
+				const zipBlob = await zip.generateAsync({ type: "blob", compression: "DEFLATE", compressionOptions: { level: 6 } });
+
+				const url = URL.createObjectURL(zipBlob);
+				const anchor = document.createElement("a");
+				anchor.href = url;
+				anchor.download = "compressed_files.zip";
+				document.body.appendChild(anchor);
+				anchor.click();
+				document.body.removeChild(anchor);
+				setTimeout(() => URL.revokeObjectURL(url), 10_000);
+			} finally {
+				if (zipBtn) {
+					zipBtn.disabled = false;
+					zipBtn.textContent = "Download All (ZIP)";
+				}
+			}
+		}
+
+
 		function showResult() {
 			hideSections();
 			$("result-section").classList.add("visible");
@@ -3560,17 +4064,21 @@
 		}
 
 		async function buildPdfImagePageData(file) {
-			const bitmap = await createImageBitmap(file);
-			const profile = analyzeImageProfile(bitmap);
-			const outputType = profile.hasAlpha ? "image/png" : "image/jpeg";
-			const blob = outputType === "image/png"
-				? await encodeOriginalType(bitmap, bitmap.width, bitmap.height, outputType, 1)
-				: await encodeLossy(bitmap, bitmap.width, bitmap.height, outputType, 0.92);
-			const arrayBuffer = await blob.arrayBuffer();
-			const width = bitmap.width;
-			const height = bitmap.height;
-			bitmap.close();
-			return { arrayBuffer, outputType, width, height };
+			let bitmap = null;
+			try {
+				bitmap = await createImageBitmap(file);
+				const profile = analyzeImageProfile(bitmap);
+				const outputType = profile.hasAlpha ? "image/png" : "image/jpeg";
+				const blob = outputType === "image/png"
+					? await encodeOriginalType(bitmap, bitmap.width, bitmap.height, outputType, 1)
+					: await encodeLossy(bitmap, bitmap.width, bitmap.height, outputType, 0.92);
+				const arrayBuffer = await blob.arrayBuffer();
+				const width = bitmap.width;
+				const height = bitmap.height;
+				return { arrayBuffer, outputType, width, height };
+			} finally {
+				if (bitmap) bitmap.close();
+			}
 		}
 
 		async function mergeFilesToPdf(files, onProgress) {
@@ -3671,6 +4179,30 @@
 						state.results.push({
 							file: { name: "merged_document.pdf" },
 							error: fallbackError instanceof Error ? fallbackError.message : "Merge failed.",
+						});
+					}
+				}
+			} else if (state.mode === "convert") {
+				const targetFormat = state.convertFormat || "image/jpeg";
+				for (let index = 0; index < state.files.length; index += 1) {
+					const file = state.files[index];
+					setProgressFileInfo(file);
+					const base = (index / state.files.length) * 100;
+					const span = 100 / state.files.length;
+					const stepProgress = (stage, pct) => showProgress(`${stage}`, base + (pct / 100) * span);
+
+					try {
+						const result = await convertFile(file, targetFormat, stepProgress);
+						// PDF -> image conversions may return one result per page.
+						if (Array.isArray(result)) {
+							result.forEach((pageResult) => state.results.push({ file, result: pageResult }));
+						} else {
+							state.results.push({ file, result });
+						}
+					} catch (error) {
+						state.results.push({
+							file,
+							error: error instanceof Error ? error.message : "Conversion failed.",
 						});
 					}
 				}
@@ -3862,7 +4394,8 @@
 			const { append = false } = options;
 			const accepted = [];
 			const imageFiles = [];
-			
+			const unsupportedFormats = new Set();
+
 			for (const file of files) {
 				const allowedInCurrentMode = state.mode === "merge"
 					? (isPdfFile(file) || isImageFile(file))
@@ -3870,21 +4403,27 @@
 
 				if (!allowedInCurrentMode) continue;
 				if (isImageFile(file)) {
-					try {
-						const bitmap = await createImageBitmap(file);
-						bitmap.close();
-						imageFiles.push(file);
-					} catch (error) {
+					const decodable = await canDecodeImage(file);
+					if (!decodable) {
+						const ext = getFileExtension(file.name).toLowerCase();
+						unsupportedFormats.add(ext === "tif" ? "tiff" : ext);
 						continue;
 					}
+					imageFiles.push(file);
 				}
 				accepted.push(file);
 			}
 
 			if (!accepted.length) {
-				showError(state.mode === "merge"
-					? "No supported local PDF or image files were selected."
-					: "No supported local PDF, image, or text files were selected.");
+				if (unsupportedFormats.size > 0) {
+					const formatLabel = [...unsupportedFormats].map((ext) => ext.toUpperCase()).join("/");
+					const mentionsHeic = unsupportedFormats.has("heic") || unsupportedFormats.has("heif");
+					showError(`Your browser doesn't support ${formatLabel} files. Please convert to JPG or PNG first${mentionsHeic ? ", or use Safari for HEIC support." : "."}`);
+				} else {
+					showError(state.mode === "merge"
+						? "No supported local PDF or image files were selected."
+						: "No supported local PDF, image, or text files were selected.");
+				}
 				return;
 			}
 
@@ -3905,6 +4444,7 @@
 			setDropFileView();
 			hideSections();
 			$("action-section").classList.add("visible");
+			refreshConvertFormatUI();
 			updateCompressButton();
 		}
 
@@ -3928,6 +4468,7 @@
 			$("progress-fill").style.width = "0%";
 			$("result-note").textContent = "";
 			hideSections();
+			refreshConvertFormatUI();
 			updateCompressButton();
 		}
 
@@ -4320,7 +4861,8 @@
 
 			for (let i = 0; i < pages.length; i++) {
 				const pageNum = pages[i];
-				showProgress("Creating PDF for page " + pageNum + "\u2026 (" + (i + 1) + " of " + pages.length + ")", 12 + Math.round((i / pages.length) * 58));
+				const pageBaseProgress = 6 + Math.round((i / pages.length) * 62);
+				showProgress("Creating PDF for page " + pageNum + "\u2026 (" + (i + 1) + " of " + pages.length + ")", pageBaseProgress);
 
 				const newDoc = await window.PDFLib.PDFDocument.create();
 				newDoc.setTitle(""); newDoc.setAuthor(""); newDoc.setSubject("");
@@ -4330,7 +4872,20 @@
 				newDoc.addPage(copiedPage);
 
 				const pdfBytes = await newDoc.save({ useObjectStreams: true, addDefaultPage: false });
-				zip.file(baseName + " - page " + pageNum + ".pdf", pdfBytes);
+				const pageFileName = baseName + " - page " + pageNum + ".pdf";
+				const pageFile = new File([pdfBytes], pageFileName, { type: "application/pdf" });
+
+				showProgress("Compressing page " + pageNum + "\u2026 (" + (i + 1) + " of " + pages.length + ")", pageBaseProgress + 3);
+				let pageResult = await compressPdf(pageFile, AUTO_LEVEL, (stage, pct) => {
+					showProgress(stage, pageBaseProgress + 3 + pct * 0.02);
+				});
+				if (pageResult.compressedSize > TARGET_MAX) {
+					pageResult = await buildGuaranteedFallbackPdf(pageFile, (stage, pct) => {
+						showProgress(stage, pageBaseProgress + 3 + pct * 0.02);
+					});
+				}
+
+				zip.file(pageFileName, pageResult.blob);
 			}
 
 			showProgress("Creating ZIP archive\u2026", 73);
@@ -4374,19 +4929,30 @@
 
 			for (let i = 0; i < pages.length; i++) {
 				const pageNum = pages[i];
-				showProgress("Copying page " + pageNum + "\u2026 (" + (i + 1) + " of " + pages.length + ")", 12 + Math.round((i / pages.length) * 76));
+				showProgress("Copying page " + pageNum + "\u2026 (" + (i + 1) + " of " + pages.length + ")", 8 + Math.round((i / pages.length) * 54));
 				const [copiedPage] = await newDoc.copyPages(sourceDoc, [pageNum - 1]);
 				newDoc.addPage(copiedPage);
 			}
 
-			showProgress("Saving PDF\u2026", 91);
+			showProgress("Saving PDF\u2026", 64);
 			const pdfBytes = await newDoc.save({ useObjectStreams: true, addDefaultPage: false });
-			const pdfBlob = new Blob([pdfBytes], { type: "application/pdf" });
+			const mergedFileName = baseName + " (extracted).pdf";
+			const mergedFile = new File([pdfBytes], mergedFileName, { type: "application/pdf" });
+
+			showProgress("Compressing extracted PDF\u2026", 70);
+			let finalResult = await compressPdf(mergedFile, AUTO_LEVEL, (stage, pct) => {
+				showProgress(stage, 70 + pct * 0.2);
+			});
+			if (finalResult.compressedSize > TARGET_MAX) {
+				finalResult = await buildGuaranteedFallbackPdf(mergedFile, (stage, pct) => {
+					showProgress(stage, 90 + pct * 0.06);
+				});
+			}
 
 			showProgress("Download starting\u2026", 98);
-			const url = URL.createObjectURL(pdfBlob);
+			const url = URL.createObjectURL(finalResult.blob);
 			const a = document.createElement("a");
-			a.href = url; a.download = baseName + " (extracted).pdf";
+			a.href = url; a.download = mergedFileName;
 			document.body.appendChild(a); a.click(); document.body.removeChild(a);
 			setTimeout(() => URL.revokeObjectURL(url), 10_000);
 
@@ -4505,6 +5071,15 @@
 		$("remove-file").addEventListener("click", (event) => {
 			event.stopPropagation();
 			resetState();
+		});
+
+		document.querySelectorAll("#format-buttons .level-btn").forEach((button) => {
+			button.addEventListener("click", () => {
+				document.querySelectorAll("#format-buttons .level-btn").forEach((btn) => btn.classList.remove("active"));
+				button.classList.add("active");
+				state.convertFormat = button.dataset.format;
+				refreshConvertFormatUI();
+			});
 		});
 
 		document.querySelectorAll(".mode-tab").forEach((button) => {
