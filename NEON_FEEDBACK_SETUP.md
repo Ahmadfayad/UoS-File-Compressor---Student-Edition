@@ -1,6 +1,8 @@
 # Customer Feedback Setup
 
-The feedback dialog appears after a successful compression, conversion, merge, or split. It submits only the star rating, optional comment, and tool mode. Files are not sent to the feedback endpoint. Vercel Web Analytics remains a separate project-level integration.
+The feedback dialog appears shortly after a successful compression, conversion, merge, or split, unless that browser dismissed or submitted the automatic survey in the last 30 days. The fixed **Feedback** tab always opens it manually, regardless of the cooldown. The cooldown is stored per browser in local storage.
+
+The survey submits only the star rating, optional comment, and tool mode. Files are not sent to the feedback endpoint. Vercel Web Analytics remains a separate project-level integration.
 
 ## Neon and Vercel
 
@@ -11,6 +13,16 @@ The feedback dialog appears after a successful compression, conversion, merge, o
 5. For local end-to-end testing, run `vercel dev` after linking the project and providing `DATABASE_URL` in the local Vercel environment.
 
 If `DATABASE_URL` is missing or the schema has not been created, the endpoint rejects the submission with a generic error and the dialog offers retry. It never reports a submission as saved until Neon confirms the insert.
+
+## Email Notifications with Resend
+
+The endpoint sends an email after Neon confirms each rating, when all of these Vercel environment variables are configured:
+
+- `RESEND_API_KEY`: create an API key in your Resend account and add it as a Vercel secret.
+- `FEEDBACK_NOTIFICATION_EMAIL`: the inbox that should receive ratings.
+- `FEEDBACK_FROM_EMAIL`: a sender address on a domain verified in Resend, for example `UoS Feedback <feedback@your-verified-domain.example>`.
+
+Add the values in Vercel Project Settings > Environment Variables for Production (and Preview if you want preview emails), then redeploy. Do not put the API key in `index.html`, the feedback request, or source control. Email is optional: ratings continue to be stored if the mail provider is unavailable, and a notification failure does not lose a saved response. The email includes the rating, tool mode, and optional comment; comments are escaped before HTML rendering.
 
 ## KPI Queries
 
