@@ -1780,7 +1780,197 @@
 			border: 1px solid rgba(197, 150, 12, 0.18);
 		}
 
+		.feedback-overlay {
+			position: fixed;
+			inset: 0;
+			z-index: 1000;
+			display: grid;
+			place-items: center;
+			padding: 20px;
+			background: rgba(16, 27, 18, 0.48);
+			backdrop-filter: blur(6px);
+		}
+
+		.feedback-overlay[hidden] { display: none; }
+
+		.feedback-dialog {
+			width: min(100%, 460px);
+			max-height: min(90vh, 720px);
+			overflow-y: auto;
+			padding: 28px;
+			border: 1px solid rgba(23, 79, 35, 0.12);
+			border-radius: 12px;
+			background: var(--surface-strong);
+			box-shadow: 0 28px 90px rgba(14, 32, 17, 0.24);
+			animation: feedbackEnter 0.22s ease-out;
+		}
+
+		@keyframes feedbackEnter {
+			from { opacity: 0; transform: translateY(10px); }
+			to { opacity: 1; transform: translateY(0); }
+		}
+
+		.feedback-eyebrow {
+			margin-bottom: 8px;
+			color: var(--green-light);
+			font-size: 11px;
+			font-weight: 800;
+			text-transform: uppercase;
+		}
+
+		.feedback-dialog h2 {
+			margin-bottom: 8px;
+			color: var(--text);
+			font-size: 20px;
+			line-height: 1.3;
+		}
+
+		.feedback-prompt,
+		.feedback-disclosure,
+		.feedback-success p {
+			color: var(--muted);
+			font-size: 13px;
+			line-height: 1.6;
+		}
+
+		.feedback-stars {
+			display: flex;
+			justify-content: center;
+			gap: 8px;
+			margin: 20px 0 16px;
+		}
+
+		.feedback-star {
+			display: grid;
+			place-items: center;
+			width: 52px;
+			height: 52px;
+			border: 1px solid rgba(23, 79, 35, 0.14);
+			border-radius: 8px;
+			background: white;
+			color: #89938a;
+			font-size: 27px;
+			cursor: pointer;
+			transition: background 0.16s ease, color 0.16s ease, transform 0.16s ease;
+		}
+
+		.feedback-star:hover,
+		.feedback-star[aria-checked="true"],
+		.feedback-star.is-lit {
+			border-color: rgba(197, 150, 12, 0.45);
+			background: #fff8df;
+			color: #a87800;
+		}
+
+		.feedback-star:hover { transform: translateY(-2px); }
+
+		.feedback-star:focus-visible,
+		.feedback-dialog button:focus-visible,
+		.feedback-dialog textarea:focus-visible {
+			outline: 2px solid var(--green-soft);
+			outline-offset: 3px;
+		}
+
+		.feedback-rating-labels {
+			display: flex;
+			justify-content: space-between;
+			margin-top: -9px;
+			margin-bottom: 20px;
+			color: var(--muted);
+			font-size: 10px;
+		}
+
+		.feedback-comment-label {
+			display: block;
+			margin-bottom: 7px;
+			color: var(--text);
+			font-size: 12px;
+			font-weight: 700;
+		}
+
+		.feedback-comment {
+			width: 100%;
+			min-height: 88px;
+			resize: vertical;
+			padding: 10px 12px;
+			border: 1px solid var(--border);
+			border-radius: 8px;
+			background: white;
+			color: var(--text);
+			font: inherit;
+			font-size: 13px;
+		}
+
+		.feedback-disclosure { margin-top: 8px; font-size: 11px; }
+
+		.feedback-error {
+			min-height: 18px;
+			margin-top: 8px;
+			color: var(--red);
+			font-size: 12px;
+		}
+
+		.feedback-actions {
+			display: flex;
+			gap: 10px;
+			margin-top: 18px;
+		}
+
+		.feedback-actions button {
+			min-height: 42px;
+			border-radius: 8px;
+			font: inherit;
+			font-size: 12px;
+			font-weight: 800;
+			cursor: pointer;
+		}
+
+		.feedback-submit {
+			flex: 1;
+			border: 0;
+			background: var(--green);
+			color: white;
+		}
+
+		.feedback-submit:disabled { cursor: not-allowed; opacity: 0.5; }
+
+		.feedback-dismiss {
+			padding: 0 14px;
+			border: 1px solid var(--border);
+			background: white;
+			color: var(--muted);
+		}
+
+		.feedback-success { padding: 8px 0; text-align: center; }
+		.feedback-success h2 { margin-top: 12px; }
+		.feedback-success[hidden],
+		#feedback-form[hidden] { display: none; }
+
+		.feedback-success-mark {
+			display: grid;
+			place-items: center;
+			width: 44px;
+			height: 44px;
+			margin: 0 auto;
+			border-radius: 50%;
+			background: var(--mint);
+			color: var(--green);
+			font-size: 22px;
+			font-weight: 800;
+		}
+
+		.feedback-trap {
+			position: absolute;
+			width: 1px;
+			height: 1px;
+			overflow: hidden;
+			clip-path: inset(50%);
+		}
+
 		@media (max-width: 640px) {
+			.feedback-dialog { padding: 22px 18px; }
+			.feedback-stars { gap: 6px; }
+			.feedback-star { width: 46px; height: 46px; }
 			.split-preview-grid {
 				grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
 				gap: 10px;
@@ -1830,7 +2020,7 @@
 				</div>
 				<div class="info-copy">
 					<h3>Private Browser Processing</h3>
-					<p>Your files are processed only inside this browser session. Nothing is uploaded, stored, or retained after you leave.</p>
+					<p>Your files stay on this device. If you submit feedback, your rating and optional comment are sent to our feedback database for service-improvement reporting.</p>
 				</div>
 				<button class="icon-btn" id="info-close" aria-label="Close information">
 					<svg viewBox="0 0 24 24" width="16" height="16"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
@@ -2055,11 +2245,44 @@
 				<p>University of Sharjah - Office of the Registrar</p>
 				<div class="footer-local">
 					<span class="footer-dot"></span>
-					<span>All processing happens locally in your browser</span>
+					<span>Files stay on your device. Submitted feedback is stored to improve the service.</span>
 				</div>
 				<p style="font-size: 10px; opacity: 0.82;">Powered by Ahmad Albalbissi</p>
 			</div>
 		</footer>
+	</div>
+
+	<div class="feedback-overlay" id="feedback-overlay" hidden>
+		<section class="feedback-dialog" id="feedback-dialog" role="dialog" aria-modal="true" aria-labelledby="feedback-title" aria-describedby="feedback-prompt">
+			<form id="feedback-form">
+				<div class="feedback-eyebrow">Customer satisfaction</div>
+				<h2 id="feedback-title">Help us improve the UoS File Compressor</h2>
+				<p class="feedback-prompt" id="feedback-prompt">Overall, how satisfied were you with your experience today?</p>
+				<div class="feedback-stars" id="feedback-stars" role="radiogroup" aria-label="Overall satisfaction rating">
+					<button class="feedback-star" type="button" role="radio" aria-checked="false" aria-label="1 star, very dissatisfied" data-rating="1" tabindex="0">★</button>
+					<button class="feedback-star" type="button" role="radio" aria-checked="false" aria-label="2 stars, dissatisfied" data-rating="2" tabindex="-1">★</button>
+					<button class="feedback-star" type="button" role="radio" aria-checked="false" aria-label="3 stars, neither satisfied nor dissatisfied" data-rating="3" tabindex="-1">★</button>
+					<button class="feedback-star" type="button" role="radio" aria-checked="false" aria-label="4 stars, satisfied" data-rating="4" tabindex="-1">★</button>
+					<button class="feedback-star" type="button" role="radio" aria-checked="false" aria-label="5 stars, very satisfied" data-rating="5" tabindex="-1">★</button>
+				</div>
+				<div class="feedback-rating-labels" aria-hidden="true"><span>Very dissatisfied</span><span>Very satisfied</span></div>
+				<label class="feedback-comment-label" for="feedback-comment">What influenced your rating? <span>(optional)</span></label>
+				<textarea class="feedback-comment" id="feedback-comment" maxlength="1000" placeholder="Share a suggestion or a little more context"></textarea>
+				<p class="feedback-disclosure">Please do not include personal or confidential information. Feedback is stored for service-improvement reporting.</p>
+				<label class="feedback-trap" aria-hidden="true">Leave this field empty<input id="feedback-website" name="website" tabindex="-1" autocomplete="off"></label>
+				<p class="feedback-error" id="feedback-error" role="status" aria-live="polite"></p>
+				<div class="feedback-actions">
+					<button class="feedback-dismiss" id="feedback-dismiss" type="button">Not now</button>
+					<button class="feedback-submit" id="feedback-submit" type="submit" disabled>Submit feedback</button>
+				</div>
+			</form>
+			<div class="feedback-success" id="feedback-success" role="status" hidden>
+				<div class="feedback-success-mark" aria-hidden="true">✓</div>
+				<h2>Thank you for your feedback</h2>
+				<p>Your response will help us improve this service.</p>
+				<div class="feedback-actions"><button class="feedback-submit" id="feedback-done" type="button">Done</button></div>
+			</div>
+		</section>
 	</div>
 
 	<script type="module">
@@ -2169,6 +2392,14 @@
 				webpEncode: false,
 			},
 			engineReady: false,
+			operationId: 0,
+			pendingImagePreferenceCancel: null,
+			feedback: {
+				rating: 0,
+				mode: null,
+				open: false,
+				timer: null,
+			},
 			split: {
 				sourceFile: null,
 				sourceDoc: null,
@@ -2213,6 +2444,16 @@
 
 		function getFileExtension(fileName = "") {
 			return fileName.includes(".") ? fileName.split(".").pop().toLowerCase() : "";
+		}
+
+		function escapeHTML(value) {
+			return String(value).replace(/[&<>"']/g, (character) => ({
+				"&": "&amp;",
+				"<": "&lt;",
+				">": "&gt;",
+				"\"": "&quot;",
+				"'": "&#39;",
+			})[character]);
 		}
 
 		function isImageFile(file) {
@@ -2464,6 +2705,11 @@
 			}
 
 			state.capabilities.webpEncode = await detectCanvasEncodeSupport("image/webp");
+			const webpButton = document.querySelector('[data-format="image/webp"]');
+			if (webpButton) {
+				webpButton.disabled = !state.capabilities.webpEncode;
+				webpButton.title = state.capabilities.webpEncode ? "" : "WEBP encoding is not supported in this browser.";
+			}
 
 			state.engineReady = true;
 			updateCompressButton();
@@ -2554,19 +2800,24 @@
 		}
 
 		async function canvasToBlob(canvas, type, quality) {
+			let blob;
 			if (typeof canvas.convertToBlob === "function") {
-				return canvas.convertToBlob({ type, quality });
+				blob = await canvas.convertToBlob({ type, quality });
+			} else {
+				blob = await new Promise((resolve, reject) => {
+					canvas.toBlob((encodedBlob) => {
+						if (!encodedBlob) {
+							reject(new Error("Canvas encoding returned null."));
+							return;
+						}
+						resolve(encodedBlob);
+					}, type, quality);
+				});
 			}
-
-			return new Promise((resolve, reject) => {
-				canvas.toBlob((blob) => {
-					if (!blob) {
-						reject(new Error("Canvas encoding returned null."));
-						return;
-					}
-					resolve(blob);
-				}, type, quality);
-			});
+			if (blob.type !== type) {
+				throw new Error(`This browser cannot encode ${type}. Choose a supported output format.`);
+			}
+			return blob;
 		}
 
 		async function encodeJpeg(bitmap, width, height, quality) {
@@ -2834,8 +3085,26 @@
 						}
 					}
 
-					const finalBlob = bestSmallBlob.size < originalSize ? bestSmallBlob : file;
-					return makeResult(finalBlob, outputName, outputType, originalSize, state.codecs.label);
+					const keptOriginal = bestSmallBlob.size >= originalSize;
+					const finalBlob = keptOriginal ? file : bestSmallBlob;
+					const originalMime = file.type || ({
+						jpg: "image/jpeg",
+						jpeg: "image/jpeg",
+						png: "image/png",
+						webp: "image/webp",
+						avif: "image/avif",
+						gif: "image/gif",
+						bmp: "image/bmp",
+						tif: "image/tiff",
+						tiff: "image/tiff",
+					})[getFileExtension(file.name)] || "application/octet-stream";
+					return makeResult(
+						finalBlob,
+						keptOriginal ? file.name : outputName,
+						keptOriginal ? originalMime : outputType,
+						originalSize,
+						state.codecs.label
+					);
 				}
 
 				onProgress(`Searching best quality…`, 20);
@@ -3421,18 +3690,28 @@
 			const baseName = file.name.replace(/\.[^.]+$/, "");
 			onProgress("Applying guaranteed fallback…", 92);
 
-			// 1) Try single-page raster from source with progressively stronger compression.
+			// Raster fallback is only valid when it preserves the complete source content.
 			const dimensions = [1600, 1300, 1000, 760, 560, 420, 320, 240, 180, 140, 110, 90];
 			const qualities = [0.82, 0.68, 0.54, 0.42, 0.32, 0.24, 0.18, 0.14, 0.1];
 
-			const tryCanvasCandidates = async (canvasBuilder) => {
+			const tryCanvasCandidates = async (canvasBuilder, preserveAlpha = false) => {
 				for (const dim of dimensions) {
 					const built = await canvasBuilder(dim);
 					if (!built) continue;
 					const { canvas, width, height } = built;
-					for (const q of qualities) {
-						const jpg = await canvasToBlob(canvas, "image/jpeg", q);
-						const pdf = await jpegBlobToSinglePagePdf(jpg, width, height);
+					for (const q of preserveAlpha ? [1] : qualities) {
+						const imageType = preserveAlpha ? "image/png" : "image/jpeg";
+						const imageBlob = await canvasToBlob(canvas, imageType, preserveAlpha ? 1 : q);
+						let pdf;
+						if (preserveAlpha) {
+							const pdfDoc = await window.PDFLib.PDFDocument.create();
+							const embedded = await pdfDoc.embedPng(await imageBlob.arrayBuffer());
+							const page = pdfDoc.addPage([width, height]);
+							page.drawImage(embedded, { x: 0, y: 0, width, height });
+							pdf = new Blob([await pdfDoc.save({ useObjectStreams: true, addDefaultPage: false })], { type: "application/pdf" });
+						} else {
+							pdf = await jpegBlobToSinglePagePdf(imageBlob, width, height);
+						}
 						if (pdf.size <= TARGET_MAX) {
 							return pdf;
 						}
@@ -3446,13 +3725,14 @@
 				let pdf = null;
 				try {
 					bitmap = await createImageBitmap(file);
+					const preserveAlpha = analyzeImageProfile(bitmap).hasAlpha;
 					pdf = await tryCanvasCandidates(async (maxDim) => {
 						const ratio = Math.min(maxDim / bitmap.width, maxDim / bitmap.height, 1);
 						const width = Math.max(1, Math.round(bitmap.width * ratio));
 						const height = Math.max(1, Math.round(bitmap.height * ratio));
 						const { canvas } = drawBitmap(bitmap, width, height, true);
 						return { canvas, width, height };
-					});
+					}, preserveAlpha);
 				} finally {
 					if (bitmap) bitmap.close();
 				}
@@ -3466,22 +3746,19 @@
 				const pdfjs = window.pdfjsLib;
 				pdfjs.GlobalWorkerOptions.workerSrc = "https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.js";
 				const loadedPdf = await pdfjs.getDocument({ data: buffer.slice(0) }).promise;
-				const page = await loadedPdf.getPage(1);
-				const pdf = await tryCanvasCandidates(async (maxDim) => {
-					const firstViewport = page.getViewport({ scale: 1 });
-					const baseMax = Math.max(firstViewport.width, firstViewport.height);
-					const scale = Math.max(0.05, maxDim / baseMax);
-					const viewport = page.getViewport({ scale });
-					const width = Math.max(1, Math.round(viewport.width));
-					const height = Math.max(1, Math.round(viewport.height));
-					const canvas = getCanvas(width, height, true);
-					const ctx = canvas.getContext("2d");
-					await page.render({ canvasContext: ctx, viewport }).promise;
-					return { canvas, width, height };
-				});
-				if (pdf) {
-					return makeResult(pdf, `${baseName}_compressed.pdf`, "application/pdf", originalSize, "Guaranteed fallback", true);
+				const attempts = [
+					{ dpiScale: 0.5, qualityDelta: -0.24, minimumQuality: 0.42 },
+					{ dpiScale: 0.4, qualityDelta: -0.3, minimumQuality: 0.36 },
+					{ dpiScale: 0.32, qualityDelta: -0.36, minimumQuality: 0.32 },
+					{ dpiScale: 0.24, qualityDelta: -0.42, minimumQuality: 0.28 },
+				];
+				for (const tuning of attempts) {
+					const pdf = await renderPdfToImagePdf(buffer, "high", originalSize, onProgress, false, tuning);
+					if (pdf.size <= TARGET_MAX) {
+						return makeResult(pdf, `${baseName}_compressed.pdf`, "application/pdf", originalSize, "Guaranteed fallback", true);
+					}
 				}
+				throw new Error("Unable to compress this PDF without losing pages. The original document was not changed.");
 			}
 
 			if (isTextFile(file)) {
@@ -3513,20 +3790,7 @@
 				}
 			}
 
-			// 2) Absolute fallback: tiny one-page PDF placeholder to guarantee non-failure.
-			const tinyCanvas = document.createElement("canvas");
-			tinyCanvas.width = 90;
-			tinyCanvas.height = 120;
-			const tinyCtx = tinyCanvas.getContext("2d");
-			tinyCtx.fillStyle = "#ffffff";
-			tinyCtx.fillRect(0, 0, 90, 120);
-			tinyCtx.fillStyle = "#111111";
-			tinyCtx.font = "9px Arial";
-			tinyCtx.fillText("Compressed", 8, 16);
-			tinyCtx.fillText("output", 8, 30);
-			const tinyJpg = await canvasToBlob(tinyCanvas, "image/jpeg", 0.1);
-			const tinyPdf = await jpegBlobToSinglePagePdf(tinyJpg, 90, 120);
-			return makeResult(tinyPdf, `${baseName}_compressed.pdf`, "application/pdf", originalSize, "Guaranteed fallback", true);
+			throw new Error("Unable to create a complete fallback PDF. The original file was not changed.");
 		}
 
 		async function gzipBlob(blob) {
@@ -3692,6 +3956,7 @@
 				const baseName = file.name.replace(/\.[^.]+$/, "");
 				const originalSize = file.size;
 				const cap = getEffectiveCap(originalSize);
+				const hasAlpha = analyzeImageProfile(bitmap).hasAlpha;
 
 				onProgress("Applying fallback: JPG rasterization…", 78);
 
@@ -3715,11 +3980,12 @@
 					const height = Math.max(1, Math.round(bitmap.height * ratio));
 
 					const { canvas } = drawBitmap(bitmap, width, height, true);
-					const pageImage = await canvasToBlob(canvas, "image/jpeg", attempt.quality);
+					const imageType = hasAlpha ? "image/png" : "image/jpeg";
+					const pageImage = await canvasToBlob(canvas, imageType, hasAlpha ? 1 : attempt.quality);
 					const pageBuffer = await pageImage.arrayBuffer();
 
 					const pdfDoc = await window.PDFLib.PDFDocument.create();
-					const embedded = await pdfDoc.embedJpg(pageBuffer);
+					const embedded = hasAlpha ? await pdfDoc.embedPng(pageBuffer) : await pdfDoc.embedJpg(pageBuffer);
 					const page = pdfDoc.addPage([width, height]);
 					page.drawImage(embedded, { x: 0, y: 0, width, height });
 
@@ -3839,6 +4105,7 @@
 
 			const profile = await detectInternalFileProfile(file);
 			let result = null;
+			let processingError = null;
 			const isTextRoute = isTextFile(file) || profile.isTextLike || profile.isLikelyMarkup;
 
 			try {
@@ -3862,25 +4129,19 @@
 					} else {
 						// Default: compress as image
 						result = await compressImage(file, levelKey, onProgress);
-						if (result.compressedSize > TARGET_MAX || !hasMeaningfulSavings(file.size, result.compressedSize)) {
-							result = await imageToLowDpiPdf(file, onProgress);
-						}
 					}
 				} else {
 					result = await compressImage(file, levelKey, onProgress);
-					if (result.compressedSize > TARGET_MAX || !hasMeaningfulSavings(file.size, result.compressedSize)) {
-						result = await imageToLowDpiPdf(file, onProgress);
-					}
 				}
 			} catch (error) {
 				result = null;
+				processingError = error;
 			}
 
-			// Only use fallback if result is null or too large AND user didn't explicitly choose PDF.
-			// Text files are exempt from rasterized fallback to preserve searchability.
-			if (!result || (result.compressedSize > TARGET_MAX && file.userPreference !== "pdf" && !isTextRoute)) {
+			if (!result && (isPdfFile(file) || (isImageFile(file) && file.userPreference === "pdf"))) {
 				result = await buildGuaranteedFallbackPdf(file, onProgress);
 			}
+			if (!result) throw processingError || new Error("Unable to process this file without changing its format or content.");
 
 			return result;
 		}
@@ -3894,7 +4155,7 @@
 				row.className = "file-list-item";
 				row.innerHTML = `
 					<div class="file-list-item-main">
-						<div class="file-list-item-name">${file.name}</div>
+						<div class="file-list-item-name">${escapeHTML(file.name)}</div>
 						<div class="file-list-item-meta">
 							<span class="badge ${badgeClass(file.type, file.name)}">${badgeLabel(file.type, file.name)}</span>
 							<span>${formatBytes(file.size)}</span>
@@ -3912,6 +4173,9 @@
 		}
 
 		function resetState() {
+			clearTimeout(state.feedback.timer);
+			state.pendingImagePreferenceCancel?.();
+			state.operationId += 1;
 			// Clean up split resources when resetting in split mode
 			if (state.mode === "split") {
 				cleanupSplitMode();
@@ -3953,8 +4217,8 @@
 				if (entry.error) {
 					row.innerHTML = `
 						<div class="result-item-main">
-							<div class="result-item-name">${entry.file.name}</div>
-							<div class="result-item-meta"><span>${entry.error}</span></div>
+							<div class="result-item-name">${escapeHTML(entry.file.name)}</div>
+							<div class="result-item-meta"><span>${escapeHTML(entry.error)}</span></div>
 						</div>
 					`;
 				} else {
@@ -3963,11 +4227,12 @@
 					const formatChanged = outputName !== entry.file.name;
 					row.innerHTML = `
 						<div class="result-item-main">
-							<div class="result-item-name">${outputName}</div>
+							<div class="result-item-name">${escapeHTML(outputName)}</div>
 							<div class="result-item-meta">
 								<span>${formatBytes(entry.result.originalSize)} -> ${formatBytes(entry.result.compressedSize)}</span>
 								<span>${entry.result.savingsPercent}% saved</span>
-								${formatChanged ? `<span>Converted from ${entry.file.name}</span>` : ""}
+								${formatChanged ? `<span>Converted from ${escapeHTML(entry.file.name)}</span>` : ""}
+								${entry.result.renderedPdf && isPdfFile(entry.file) ? "<span>Rasterized PDF: text search and interactive content are not preserved.</span>" : ""}
 								${noGain ? "<span>Already optimized in original format.</span>" : ""}
 							</div>
 						</div>
@@ -4064,6 +4329,108 @@
 				: "No files were processed successfully.";
 
 			renderBatchResults();
+			if (successful.length) scheduleFeedbackPrompt(state.mode);
+		}
+
+		const FEEDBACK_COOLDOWN_KEY = "uos-compressor-feedback-dismissed-at";
+		const FEEDBACK_COOLDOWN_MS = 30 * 24 * 60 * 60 * 1000;
+
+		function feedbackIsOnCooldown() {
+			try {
+				const lastPrompt = Number(localStorage.getItem(FEEDBACK_COOLDOWN_KEY));
+				return Number.isFinite(lastPrompt) && Date.now() - lastPrompt < FEEDBACK_COOLDOWN_MS;
+			} catch (error) {
+				return false;
+			}
+		}
+
+		function markFeedbackPrompted() {
+			try {
+				localStorage.setItem(FEEDBACK_COOLDOWN_KEY, String(Date.now()));
+			} catch (error) {
+			}
+		}
+
+		function scheduleFeedbackPrompt(mode) {
+			if (feedbackIsOnCooldown() || state.feedback.open) return;
+			clearTimeout(state.feedback.timer);
+			state.feedback.mode = mode;
+			state.feedback.timer = setTimeout(() => {
+				const resultVisible = $("result-section").classList.contains("visible");
+				if (state.mode === mode && resultVisible && !feedbackIsOnCooldown()) openFeedbackDialog();
+			}, 900);
+		}
+
+		function openFeedbackDialog() {
+			if (feedbackIsOnCooldown() || state.feedback.open) return;
+			state.feedback.rating = 0;
+			state.feedback.open = true;
+			state.feedback.previousFocus = document.activeElement;
+			$("feedback-form").hidden = false;
+			$("feedback-success").hidden = true;
+			$("feedback-comment").value = "";
+			$("feedback-website").value = "";
+			$("feedback-error").textContent = "";
+			$("feedback-submit").disabled = true;
+			$("feedback-submit").textContent = "Submit feedback";
+			document.querySelectorAll(".feedback-star").forEach((button, index) => {
+				button.setAttribute("aria-checked", "false");
+				button.classList.remove("is-lit");
+				button.tabIndex = index === 0 ? 0 : -1;
+			});
+			$("feedback-overlay").hidden = false;
+			$("feedback-stars").querySelector(".feedback-star").focus();
+		}
+
+		function closeFeedbackDialog(recordDismissal = true) {
+			if (!state.feedback.open) return;
+			state.feedback.open = false;
+			$("feedback-overlay").hidden = true;
+			if (recordDismissal) markFeedbackPrompted();
+			if (state.feedback.previousFocus?.isConnected) state.feedback.previousFocus.focus();
+		}
+
+		function selectFeedbackRating(button) {
+			state.feedback.rating = Number(button.dataset.rating);
+			document.querySelectorAll(".feedback-star").forEach((star) => {
+				const selected = Number(star.dataset.rating) === state.feedback.rating;
+				star.setAttribute("aria-checked", String(selected));
+				star.tabIndex = selected ? 0 : -1;
+				star.classList.toggle("is-lit", Number(star.dataset.rating) <= state.feedback.rating);
+			});
+			$("feedback-submit").disabled = false;
+		}
+
+		async function submitFeedback(event) {
+			event.preventDefault();
+			if (!state.feedback.rating) return;
+
+			const submitButton = $("feedback-submit");
+			submitButton.disabled = true;
+			submitButton.textContent = "Submitting…";
+			$("feedback-error").textContent = "";
+
+			try {
+				const response = await fetch("/api/feedback", {
+					method: "POST",
+					headers: { "Content-Type": "application/json" },
+					body: JSON.stringify({
+						rating: state.feedback.rating,
+						comment: $("feedback-comment").value.trim(),
+						mode: state.feedback.mode,
+						website: $("feedback-website").value,
+					}),
+				});
+				if (!response.ok) throw new Error("Feedback submission failed.");
+				markFeedbackPrompted();
+				$("feedback-form").hidden = true;
+				$("feedback-success").hidden = false;
+				$("feedback-done").focus();
+			} catch (error) {
+				$("feedback-error").textContent = "We couldn't submit your feedback right now. Please try again.";
+				submitButton.disabled = false;
+				submitButton.textContent = "Submit feedback";
+			}
 		}
 
 		async function buildPdfImagePageData(file) {
@@ -4141,88 +4508,107 @@
 
 		async function handleCompression() {
 			if (!state.files.length || !state.engineReady) return;
+			const operationId = ++state.operationId;
+			const operationMode = state.mode;
+			const files = [...state.files];
+			const convertFormat = state.convertFormat;
+			const results = [];
+			const reportProgress = (stage, pct) => {
+				if (state.operationId === operationId && state.mode === operationMode) showProgress(stage, pct);
+			};
 
 			hideSections();
 			$("progress-section").classList.add("visible");
-			showProgress("Starting…", 0);
+			reportProgress("Starting…", 0);
 			state.results = [];
 
-			if (state.mode === "merge") {
-				const totalSize = state.files.reduce((sum, file) => sum + file.size, 0);
+			if (operationMode === "merge") {
+				const totalSize = files.reduce((sum, file) => sum + file.size, 0);
 				setProgressFileInfo({ name: "merged_document.pdf", type: "application/pdf", size: totalSize });
 				try {
-					const mergedFile = await mergeFilesToPdf(state.files, (stage, pct) => {
-						showProgress(stage, pct);
+					const mergedFile = await mergeFilesToPdf(files, (stage, pct) => {
+						reportProgress(stage, pct);
 					});
+					if (state.operationId !== operationId || state.mode !== operationMode) return;
 					const result = await compressPdf(mergedFile, AUTO_LEVEL, (stage, pct) => {
-						showProgress(stage, 45 + pct * 0.55);
+						reportProgress(stage, 45 + pct * 0.55);
 					}, {
 						preferTextPreservation: false,
 						preserveColor: true,
 					});
+					if (state.operationId !== operationId || state.mode !== operationMode) return;
 
 					let finalResult = result;
 					if (finalResult.compressedSize > TARGET_MAX) {
 						finalResult = await buildGuaranteedFallbackPdf(mergedFile, (stage, pct) => {
-							showProgress(stage, 70 + pct * 0.3);
+							reportProgress(stage, 70 + pct * 0.3);
 						});
 					}
 
-					state.results.push({ file: mergedFile, result: finalResult });
+					results.push({ file: mergedFile, result: finalResult });
 				} catch (error) {
+					if (state.operationId !== operationId || state.mode !== operationMode) return;
 					try {
-						const mergedFile = await mergeFilesToPdf(state.files, (stage, pct) => {
-							showProgress(stage, pct);
+						const mergedFile = await mergeFilesToPdf(files, (stage, pct) => {
+							reportProgress(stage, pct);
 						});
+						if (state.operationId !== operationId || state.mode !== operationMode) return;
 						const fallbackResult = await buildGuaranteedFallbackPdf(mergedFile, (stage, pct) => {
-							showProgress(stage, 70 + pct * 0.3);
+							reportProgress(stage, 70 + pct * 0.3);
 						});
-						state.results.push({ file: mergedFile, result: fallbackResult });
+						if (state.operationId !== operationId || state.mode !== operationMode) return;
+						results.push({ file: mergedFile, result: fallbackResult });
 					} catch (fallbackError) {
-						state.results.push({
+						results.push({
 							file: { name: "merged_document.pdf" },
 							error: fallbackError instanceof Error ? fallbackError.message : "Merge failed.",
 						});
 					}
 				}
-			} else if (state.mode === "convert") {
-				const targetFormat = state.convertFormat || "image/jpeg";
-				for (let index = 0; index < state.files.length; index += 1) {
-					const file = state.files[index];
+			} else if (operationMode === "convert") {
+				const targetFormat = convertFormat || "image/jpeg";
+				for (let index = 0; index < files.length; index += 1) {
+					if (state.operationId !== operationId || state.mode !== operationMode) return;
+					const file = files[index];
 					setProgressFileInfo(file);
-					const base = (index / state.files.length) * 100;
-					const span = 100 / state.files.length;
-					const stepProgress = (stage, pct) => showProgress(`${stage}`, base + (pct / 100) * span);
+					const base = (index / files.length) * 100;
+					const span = 100 / files.length;
+					const stepProgress = (stage, pct) => reportProgress(`${stage}`, base + (pct / 100) * span);
 
 					try {
 						const result = await convertFile(file, targetFormat, stepProgress);
+						if (state.operationId !== operationId || state.mode !== operationMode) return;
 						// PDF -> image conversions may return one result per page.
 						if (Array.isArray(result)) {
-							result.forEach((pageResult) => state.results.push({ file, result: pageResult }));
+							result.forEach((pageResult) => results.push({ file, result: pageResult }));
 						} else {
-							state.results.push({ file, result });
+							results.push({ file, result });
 						}
 					} catch (error) {
-						state.results.push({
+						if (state.operationId !== operationId || state.mode !== operationMode) return;
+						results.push({
 							file,
 							error: error instanceof Error ? error.message : "Conversion failed.",
 						});
 					}
 				}
 			} else {
-				for (let index = 0; index < state.files.length; index += 1) {
-					const file = state.files[index];
+				for (let index = 0; index < files.length; index += 1) {
+					if (state.operationId !== operationId || state.mode !== operationMode) return;
+					const file = files[index];
 					setProgressFileInfo(file);
-					const base = (index / state.files.length) * 100;
-					const span = 100 / state.files.length;
+					const base = (index / files.length) * 100;
+					const span = 100 / files.length;
 
 					try {
 						const result = await compressFile(file, AUTO_LEVEL, (stage, pct) => {
-							showProgress(`${stage}`, base + (pct / 100) * span);
+							reportProgress(`${stage}`, base + (pct / 100) * span);
 						});
-						state.results.push({ file, result });
+						if (state.operationId !== operationId || state.mode !== operationMode) return;
+						results.push({ file, result });
 					} catch (error) {
-						state.results.push({
+						if (state.operationId !== operationId || state.mode !== operationMode) return;
+						results.push({
 							file,
 							error: error instanceof Error ? error.message : "Compression failed.",
 						});
@@ -4230,7 +4616,10 @@
 				}
 			}
 
-			showResult();
+			if (state.operationId === operationId && state.mode === operationMode) {
+				state.results = results;
+				showResult();
+			}
 		}
 
 		function mergeUniqueFiles(existingFiles, nextFiles) {
@@ -4250,6 +4639,7 @@
 
 		async function askImageConversionPreference(imageFiles) {
 			return new Promise((resolve) => {
+				let settled = false;
 				const overlay = document.createElement("div");
 				overlay.style.cssText = `
 					position: fixed;
@@ -4267,6 +4657,9 @@
 				`;
 
 				const modal = document.createElement("div");
+				modal.setAttribute("role", "dialog");
+				modal.setAttribute("aria-modal", "true");
+				modal.setAttribute("aria-labelledby", "image-preference-title");
 				modal.style.cssText = `
 					background: linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(248, 252, 248, 0.95));
 					border-radius: 24px;
@@ -4310,7 +4703,7 @@
 								<polyline points="21 15 16 10 5 21"></polyline>
 							</svg>
 						</div>
-						<h3 style="
+						<h3 id="image-preference-title" style="
 							font-size: 20px;
 							font-weight: 900;
 							color: var(--green);
@@ -4374,27 +4767,59 @@
 
 				overlay.appendChild(modal);
 				document.body.appendChild(overlay);
+				const finish = (preference) => {
+					if (settled) return;
+					settled = true;
+					document.removeEventListener("keydown", onDialogKeydown);
+					if (overlay.isConnected) overlay.remove();
+					if (state.pendingImagePreferenceCancel === cancel) state.pendingImagePreferenceCancel = null;
+					resolve(preference);
+				};
+				const cancel = () => finish(null);
+				const onDialogKeydown = (event) => {
+					if (event.key === "Escape") {
+						event.preventDefault();
+						cancel();
+					}
+				};
+				state.pendingImagePreferenceCancel = cancel;
+				document.addEventListener("keydown", onDialogKeydown);
+				overlay.addEventListener("click", (event) => {
+					if (event.target === overlay) cancel();
+				});
 
 				modal.querySelector("#compress-image-btn").addEventListener("click", () => {
-					document.body.removeChild(overlay);
-					resolve("image");
+					finish("image");
 				});
 
 				modal.querySelector("#convert-pdf-btn").addEventListener("click", () => {
-					document.body.removeChild(overlay);
-					resolve("pdf");
+					finish("pdf");
 				});
+				modal.querySelector("#compress-image-btn").focus();
 			});
 		}
 
 		async function handleSelectedFiles(files, options = {}) {
+			state.pendingImagePreferenceCancel?.();
+			const operationId = ++state.operationId;
+			const selectionMode = state.mode;
+			const oversizedFiles = files.filter((file) => file.size > MAX_INPUT_BYTES);
+			if (oversizedFiles.length) {
+				showError(`Each file must be 100 MB or smaller. ${oversizedFiles.map((file) => file.name).join(", ")} exceeds the limit.`);
+				return;
+			}
+			const { append = false } = options;
+			const projectedFiles = state.mode === "merge" && append ? mergeUniqueFiles(state.files, files) : files;
+			if (state.mode === "merge" && projectedFiles.reduce((total, file) => total + file.size, 0) > MAX_INPUT_BYTES) {
+				showError("The combined files for a merge must total 100 MB or less.");
+				return;
+			}
 			// Route split mode to its own handler
 			if (state.mode === "split") {
 				await handleSplitFiles(files);
 				return;
 			}
 
-			const { append = false } = options;
 			const accepted = [];
 			const imageFiles = [];
 			const unsupportedFormats = new Set();
@@ -4407,6 +4832,7 @@
 				if (!allowedInCurrentMode) continue;
 				if (isImageFile(file)) {
 					const decodable = await canDecodeImage(file);
+					if (state.operationId !== operationId || state.mode !== selectionMode) return;
 					if (!decodable) {
 						const ext = getFileExtension(file.name).toLowerCase();
 						unsupportedFormats.add(ext === "tif" ? "tiff" : ext);
@@ -4433,6 +4859,8 @@
 			// Ask user preference if images are detected (only in compress mode)
 			if (imageFiles.length > 0 && state.mode === "compress") {
 				const preference = await askImageConversionPreference(imageFiles);
+				if (state.operationId !== operationId || state.mode !== selectionMode) return;
+				if (preference === null) return;
 				
 				// Store the preference in ALL accepted files (to ensure it persists)
 				for (const file of accepted) {
@@ -4442,6 +4870,7 @@
 				}
 			}
 
+			if (state.operationId !== operationId || state.mode !== selectionMode) return;
 			state.files = append ? mergeUniqueFiles(state.files, accepted) : accepted;
 			state.results = [];
 			setDropFileView();
@@ -4453,6 +4882,9 @@
 
 		function setMode(mode) {
 			if (state.mode === mode) return;
+			clearTimeout(state.feedback.timer);
+			state.pendingImagePreferenceCancel?.();
+			state.operationId += 1;
 			// Cleanup split resources when leaving split mode
 			const prevMode = state.mode;
 			state.mode = mode;
@@ -4529,7 +4961,7 @@
 			row.className = "file-list-item";
 			row.innerHTML =
 				'<div class="file-list-item-main">' +
-					'<div class="file-list-item-name">' + file.name + '</div>' +
+					'<div class="file-list-item-name">' + escapeHTML(file.name) + '</div>' +
 					'<div class="file-list-item-meta">' +
 						'<span class="badge badge-pdf">PDF</span>' +
 						'<span>' + formatBytes(file.size) + '</span>' +
@@ -4647,18 +5079,22 @@
 
 			for (const part of parts) {
 				const trimmed = part.trim();
-				if (!trimmed) continue;
+				if (!trimmed) return null;
 
 				if (trimmed.includes("-")) {
 					const halves = trimmed.split("-");
 					if (halves.length !== 2) return null;
-					const start = parseInt(halves[0].trim(), 10);
-					const end = parseInt(halves[1].trim(), 10);
-					if (isNaN(start) || isNaN(end) || start < 1 || end > max || start > end) return null;
+					const startText = halves[0].trim();
+					const endText = halves[1].trim();
+					if (!/^\d+$/.test(startText) || !/^\d+$/.test(endText)) return null;
+					const start = Number(startText);
+					const end = Number(endText);
+					if (start < 1 || end > max || start > end) return null;
 					for (let i = start; i <= end; i++) pages.add(i);
 				} else {
-					const page = parseInt(trimmed, 10);
-					if (isNaN(page) || page < 1 || page > max) return null;
+					if (!/^\d+$/.test(trimmed)) return null;
+					const page = Number(trimmed);
+					if (page < 1 || page > max) return null;
 					pages.add(page);
 				}
 			}
@@ -4666,15 +5102,16 @@
 		}
 
 		/** Render a single page thumbnail into its card. */
-		async function renderThumbnailForCard(pageNum) {
-			if (!state.split.pdfjsDoc) return;
+		async function renderThumbnailForCard(pageNum, operationId, pdfjsDoc) {
+			if (state.operationId !== operationId || state.mode !== "split" || state.split.pdfjsDoc !== pdfjsDoc) return;
 			const grid = $("split-grid");
 			if (!grid) return;
 			const card = grid.querySelector("[data-page=\"" + pageNum + "\"]");
 			if (!card) return;
 
 			try {
-				const page = await state.split.pdfjsDoc.getPage(pageNum);
+				const page = await pdfjsDoc.getPage(pageNum);
+				if (state.operationId !== operationId || state.mode !== "split" || state.split.pdfjsDoc !== pdfjsDoc) return;
 				const viewport = page.getViewport({ scale: 1 });
 				const TARGET_WIDTH = 180;
 				const scale = TARGET_WIDTH / viewport.width;
@@ -4685,15 +5122,20 @@
 				canvas.height = Math.max(1, Math.round(scaledViewport.height));
 				const ctx = canvas.getContext("2d");
 				await page.render({ canvasContext: ctx, viewport: scaledViewport }).promise;
+				if (state.operationId !== operationId || state.mode !== "split" || state.split.pdfjsDoc !== pdfjsDoc) return;
 
 				const url = await new Promise((resolve, reject) => {
 					canvas.toBlob((blob) => {
 						if (!blob) { reject(new Error("Canvas toBlob returned null")); return; }
 						const objUrl = URL.createObjectURL(blob);
-						state.split.thumbnailUrls.push(objUrl);
 						resolve(objUrl);
 					}, "image/jpeg", 0.75);
 				});
+					if (state.operationId !== operationId || state.mode !== "split" || state.split.pdfjsDoc !== pdfjsDoc) {
+						URL.revokeObjectURL(url);
+						return;
+					}
+					state.split.thumbnailUrls.push(url);
 
 				const shimmer = card.querySelector(".preview-card-shimmer");
 				if (shimmer) shimmer.remove();
@@ -4702,6 +5144,7 @@
 				if (img) { img.src = url; img.hidden = false; }
 
 			} catch (err) {
+				if (state.operationId !== operationId || state.mode !== "split" || state.split.pdfjsDoc !== pdfjsDoc) return;
 				const shimmer = card.querySelector(".preview-card-shimmer");
 				if (shimmer) {
 					shimmer.className = "preview-card-error";
@@ -4711,7 +5154,7 @@
 		}
 
 		/** Build the preview grid: create all placeholder cards, then lazy-render in batches of 4. */
-		async function renderSplitPreviewGrid() {
+		async function renderSplitPreviewGrid(operationId, pdfjsDoc) {
 			const grid = $("split-grid");
 			grid.innerHTML = "";
 			const pageCount = state.split.pageCount;
@@ -4733,12 +5176,13 @@
 			// Lazy render in batches of 4
 			const BATCH_SIZE = 4;
 			for (let i = 1; i <= pageCount; i += BATCH_SIZE) {
-				if (!state.split.pdfjsDoc) break; // aborted (mode changed)
+				if (state.operationId !== operationId || state.mode !== "split" || state.split.pdfjsDoc !== pdfjsDoc) return;
 				const batch = [];
 				for (let j = i; j < Math.min(i + BATCH_SIZE, pageCount + 1); j++) {
-					batch.push(renderThumbnailForCard(j));
+					batch.push(renderThumbnailForCard(j, operationId, pdfjsDoc));
 				}
 				await Promise.all(batch);
+				if (state.operationId !== operationId || state.mode !== "split" || state.split.pdfjsDoc !== pdfjsDoc) return;
 				// Yield to the UI thread between batches
 				await new Promise((r) => setTimeout(r, 0));
 			}
@@ -4746,10 +5190,16 @@
 
 		/** Accept one PDF in split mode: load it, render previews, reveal UI. */
 		async function handleSplitFileAccepted(file) {
+			const operationId = ++state.operationId;
+			state.split.thumbnailUrls.forEach((url) => URL.revokeObjectURL(url));
+			state.split.thumbnailUrls = [];
+			if (state.split.pdfjsDoc) {
+				try { state.split.pdfjsDoc.destroy(); } catch (_) {}
+				state.split.pdfjsDoc = null;
+			}
 			state.split.sourceFile = file;
 			state.split.selectedPages = new Set();
 			state.split.pageCount = 0;
-			state.split.thumbnailUrls = [];
 
 			// Show the file in the drop zone
 			state.files = [file];
@@ -4771,6 +5221,7 @@
 
 			try {
 				const arrayBuffer = await file.arrayBuffer();
+				if (state.operationId !== operationId || state.mode !== "split") return;
 
 				// Ensure the PDF.js worker is configured before use
 				window.pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.js";
@@ -4779,6 +5230,7 @@
 				try {
 					pdfjsDoc = await window.pdfjsLib.getDocument({ data: arrayBuffer.slice(0) }).promise;
 				} catch (err) {
+					if (state.operationId !== operationId || state.mode !== "split") return;
 					$("split-loading").hidden = true;
 					const msg = err && err.name === "PasswordException"
 						? "This PDF is password-protected. Split isn\u2019t supported for encrypted files."
@@ -4788,6 +5240,10 @@
 					state.split.sourceFile = null;
 					$("drop-empty").style.display = "block";
 					$("drop-file").style.display = "none";
+					return;
+				}
+				if (state.operationId !== operationId || state.mode !== "split") {
+					pdfjsDoc.destroy();
 					return;
 				}
 
@@ -4806,7 +5262,8 @@
 				updateSplitSourceCardPageCount();
 
 				// Render all thumbnails
-				await renderSplitPreviewGrid();
+				await renderSplitPreviewGrid(operationId, pdfjsDoc);
+				if (state.operationId !== operationId || state.mode !== "split") return;
 
 				$("split-loading").hidden = true;
 				$("split-toolbar").hidden = false;
@@ -4817,6 +5274,7 @@
 				updateCompressButton();
 
 			} catch (err) {
+				if (state.operationId !== operationId || state.mode !== "split") return;
 				$("split-loading").hidden = true;
 				showError("Failed to load the PDF: " + (err instanceof Error ? err.message : "unknown error."));
 				cleanupSplitMode();
@@ -4827,6 +5285,10 @@
 
 		/** Validate dropped/selected files for split mode and route to handleSplitFileAccepted. */
 		async function handleSplitFiles(files) {
+			if (files.some((file) => file.size > MAX_INPUT_BYTES)) {
+				showError("The PDF must be 100 MB or smaller.");
+				return;
+			}
 			const pdfs = files.filter((f) => isPdfFile(f));
 
 			if (files.length === 0) {
@@ -4845,7 +5307,7 @@
 		}
 
 		/** Extract selected pages as separate single-page PDFs, bundle into a ZIP. */
-		async function extractPagesSeparate() {
+		async function extractPagesSeparate(operationId) {
 			const { sourceFile, selectedPages } = state.split;
 			const pages = Array.from(selectedPages).sort((a, b) => a - b);
 			const baseName = sourceFile.name.replace(/\.pdf$/i, "");
@@ -4863,6 +5325,7 @@
 			const zip = new window.JSZip();
 
 			for (let i = 0; i < pages.length; i++) {
+				if (state.operationId !== operationId || state.mode !== "split") throw new Error("Extraction cancelled because the tool mode changed.");
 				const pageNum = pages[i];
 				const pageBaseProgress = 6 + Math.round((i / pages.length) * 62);
 				showProgress("Creating PDF for page " + pageNum + "\u2026 (" + (i + 1) + " of " + pages.length + ")", pageBaseProgress);
@@ -4897,6 +5360,7 @@
 				{ type: "blob", compression: "DEFLATE", compressionOptions: { level: 6 } },
 				(meta) => { showProgress("Compressing ZIP\u2026 (" + Math.round(meta.percent) + "%)", 73 + Math.round(meta.percent * 0.22)); }
 			);
+			if (state.operationId !== operationId || state.mode !== "split") throw new Error("Extraction cancelled because the tool mode changed.");
 
 			showProgress("Download starting\u2026", 98);
 
@@ -4911,7 +5375,7 @@
 		}
 
 		/** Extract selected pages into a single merged PDF. */
-		async function extractPagesMerged() {
+		async function extractPagesMerged(operationId) {
 			const { sourceFile, selectedPages } = state.split;
 			const pages = Array.from(selectedPages).sort((a, b) => a - b);
 			const baseName = sourceFile.name.replace(/\.pdf$/i, "");
@@ -4931,6 +5395,7 @@
 			newDoc.setKeywords([]); newDoc.setProducer(""); newDoc.setCreator("");
 
 			for (let i = 0; i < pages.length; i++) {
+				if (state.operationId !== operationId || state.mode !== "split") throw new Error("Extraction cancelled because the tool mode changed.");
 				const pageNum = pages[i];
 				showProgress("Copying page " + pageNum + "\u2026 (" + (i + 1) + " of " + pages.length + ")", 8 + Math.round((i / pages.length) * 54));
 				const [copiedPage] = await newDoc.copyPages(sourceDoc, [pageNum - 1]);
@@ -4951,6 +5416,7 @@
 					showProgress(stage, 90 + pct * 0.06);
 				});
 			}
+			if (state.operationId !== operationId || state.mode !== "split") throw new Error("Extraction cancelled because the tool mode changed.");
 
 			showProgress("Download starting\u2026", 98);
 			const url = URL.createObjectURL(finalResult.blob);
@@ -4973,6 +5439,7 @@
 				showError("Please select at least one page to extract.");
 				return;
 			}
+			const operationId = ++state.operationId;
 
 			hideSections();
 			$("progress-section").classList.add("visible");
@@ -4985,10 +5452,11 @@
 			try {
 				let resultInfo;
 				if (state.split.downloadMode === "separate") {
-					resultInfo = await extractPagesSeparate();
+					resultInfo = await extractPagesSeparate(operationId);
 				} else {
-					resultInfo = await extractPagesMerged();
+					resultInfo = await extractPagesMerged(operationId);
 				}
+				if (state.operationId !== operationId || state.mode !== "split") return;
 
 				hideSections();
 				$("result-section").classList.add("visible");
@@ -5000,8 +5468,10 @@
 				$("result-note").textContent = mode === "separate"
 					? "Extracted " + pages + " page" + (pages !== 1 ? "s" : "") + " from \u201c" + fname + "\u201d into a ZIP."
 					: "Extracted " + pages + " page" + (pages !== 1 ? "s" : "") + " from \u201c" + fname + "\u201d into one PDF.";
+				scheduleFeedbackPrompt("split");
 
 			} catch (err) {
+				if (state.operationId !== operationId || state.mode !== "split") return;
 				showError("Extraction failed: " + (err instanceof Error ? err.message : "Unknown error."));
 			}
 		}
@@ -5018,6 +5488,47 @@
 			$("info-btn").setAttribute("aria-expanded", "false");
 		});
 
+		document.querySelectorAll(".feedback-star").forEach((button) => {
+			button.addEventListener("click", () => selectFeedbackRating(button));
+			button.addEventListener("keydown", (event) => {
+				if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
+				event.preventDefault();
+				const stars = Array.from(document.querySelectorAll(".feedback-star"));
+				const currentIndex = stars.indexOf(button);
+				const delta = event.key === "ArrowRight" ? 1 : -1;
+				const next = stars[(currentIndex + delta + stars.length) % stars.length];
+				selectFeedbackRating(next);
+				next.focus();
+			});
+		});
+
+		$("feedback-form").addEventListener("submit", submitFeedback);
+		$("feedback-dismiss").addEventListener("click", () => closeFeedbackDialog());
+		$("feedback-done").addEventListener("click", () => closeFeedbackDialog(false));
+		$("feedback-overlay").addEventListener("click", (event) => {
+			if (event.target === $("feedback-overlay")) closeFeedbackDialog();
+		});
+		document.addEventListener("keydown", (event) => {
+			if (!state.feedback.open) return;
+			if (event.key === "Escape") {
+				event.preventDefault();
+				closeFeedbackDialog();
+				return;
+			}
+			if (event.key !== "Tab") return;
+			const focusable = Array.from($("feedback-dialog").querySelectorAll("button:not(:disabled), textarea:not(:disabled)"))
+				.filter((element) => element.getClientRects().length > 0);
+			const first = focusable[0];
+			const last = focusable[focusable.length - 1];
+			if (event.shiftKey && document.activeElement === first) {
+				event.preventDefault();
+				last.focus();
+			} else if (!event.shiftKey && document.activeElement === last) {
+				event.preventDefault();
+				first.focus();
+			}
+		});
+
 		$("drop-zone").addEventListener("click", (event) => {
 			if (!event.target.closest("#remove-file")) {
 				$("file-input").click();
@@ -5025,6 +5536,7 @@
 		});
 
 		$("drop-zone").addEventListener("keydown", (event) => {
+			if (event.target !== $("drop-zone")) return;
 			if (event.key === "Enter" || event.key === " ") {
 				event.preventDefault();
 				$("file-input").click();
