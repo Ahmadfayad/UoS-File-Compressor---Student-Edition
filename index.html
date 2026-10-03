@@ -4481,13 +4481,19 @@
 						website: $("feedback-website").value,
 					}),
 				});
-				if (!response.ok) throw new Error("Feedback submission failed.");
+				if (!response.ok) {
+					const payload = await response.json().catch(() => null);
+					const serverMessage = typeof payload?.error === "string" ? payload.error : "Feedback submission failed.";
+					throw new Error(serverMessage);
+				}
 				markFeedbackPrompted();
 				$("feedback-form").hidden = true;
 				$("feedback-success").hidden = false;
 				$("feedback-done").focus();
 			} catch (error) {
-				$("feedback-error").textContent = "We couldn't submit your feedback right now. Please try again.";
+				$("feedback-error").textContent = error instanceof Error && error.message
+					? error.message
+					: "We couldn't submit your feedback right now. Please try again.";
 				submitButton.disabled = false;
 				submitButton.textContent = "Submit feedback";
 			}
