@@ -2941,9 +2941,30 @@
 
 		function getImageStrategy(file, profile) {
 			const extension = getFileExtension(file.name);
-			const originalType = file.type || `image/${extension}`;
+			const originalType = file.type || ({
+				jpg: "image/jpeg",
+				jpeg: "image/jpeg",
+				png: "image/png",
+				webp: "image/webp",
+			})[extension] || `image/${extension}`;
 			const isPngFamily = originalType === "image/png";
 			const preserveTransparency = profile.hasAlpha;
+			if (file.userPreference === "image") {
+				if (originalType === "image/jpeg") {
+					return {
+						type: "image/jpeg",
+						extension: ".jpg",
+						minQuality: profile.kind === "photo" ? MIN_JPEG_QUALITY : 0.74,
+						maxQuality: 0.95,
+					};
+				}
+				if (originalType === "image/png") {
+					return { type: "image/png", extension: ".png", minQuality: 0.92, maxQuality: 1 };
+				}
+				if (originalType === "image/webp" && state.capabilities.webpEncode) {
+					return { type: "image/webp", extension: ".webp", minQuality: 0.78, maxQuality: 0.96 };
+				}
+			}
 
 			if (preserveTransparency) {
 				if (state.capabilities.webpEncode) {
