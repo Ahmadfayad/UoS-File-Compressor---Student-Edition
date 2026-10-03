@@ -4424,12 +4424,12 @@
 		}
 
 		function scheduleFeedbackPrompt(mode) {
-			if (feedbackIsOnCooldown() || state.feedback.open) return;
+			if (feedbackIsOnCooldown() || feedbackWasSubmittedToday() || state.feedback.open) return;
 			clearTimeout(state.feedback.timer);
 			state.feedback.mode = mode;
 			state.feedback.timer = setTimeout(() => {
 				const resultVisible = $("result-section").classList.contains("visible");
-				if (state.mode === mode && resultVisible && !feedbackIsOnCooldown()) openFeedbackDialog();
+				if (state.mode === mode && resultVisible && !feedbackIsOnCooldown() && !feedbackWasSubmittedToday()) openFeedbackDialog();
 			}, 350);
 		}
 
