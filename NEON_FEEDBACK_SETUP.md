@@ -1,6 +1,6 @@
 # Customer Feedback Setup
 
-The feedback dialog appears shortly after a successful compression, conversion, merge, or split, unless that browser dismissed or submitted the automatic survey in the last 30 days. The fixed **Feedback** tab always opens it manually, regardless of the cooldown. The cooldown is stored per browser in local storage.
+The feedback dialog appears shortly after a successful download, unless that browser dismissed the automatic survey within the last 24 hours. The fixed bottom-corner **Share feedback** button is always available. After a successful submission, that browser cannot submit another rating for 24 hours; reopening the survey shows a friendly confirmation instead. These cooldowns are stored per browser in local storage.
 
 The survey submits only the star rating, optional comment, and tool mode. Files are not sent to the feedback endpoint. Vercel Web Analytics remains a separate project-level integration.
 
@@ -46,4 +46,4 @@ GROUP BY tool_mode, rating
 ORDER BY tool_mode, rating;
 ```
 
-The prompt is shown at most once per browser every 30 days after dismissal or successful submission. This is a user-experience cooldown, not an identity or server-side anti-abuse guarantee. The API validates fields, enforces same-origin requests, limits payload size, and includes a honeypot field; it does not store IP addresses.
+Automatic prompting is limited to once per browser every 24 hours after dismissal. Successful submissions are also limited to once per browser every 24 hours. This is a user-experience guard, not a strong identity-based or server-side abuse guarantee; clearing browser storage can reset it. The API validates fields, enforces same-origin requests, limits payload size, and includes a honeypot field; it does not store IP addresses.
