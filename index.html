@@ -4314,6 +4314,7 @@
 					anchor.click();
 					document.body.removeChild(anchor);
 					setTimeout(() => URL.revokeObjectURL(url), 10_000);
+					scheduleFeedbackPrompt(state.mode);
 				});
 			});
 		}
@@ -4333,6 +4334,7 @@
 					setTimeout(() => URL.revokeObjectURL(url), 5_000);
 				}, index * 300);
 			});
+			if (successful.length) scheduleFeedbackPrompt(state.mode);
 		}
 
 		async function downloadAllAsZip() {
@@ -4369,6 +4371,7 @@
 				anchor.click();
 				document.body.removeChild(anchor);
 				setTimeout(() => URL.revokeObjectURL(url), 10_000);
+				scheduleFeedbackPrompt(state.mode);
 			} finally {
 				if (zipBtn) {
 					zipBtn.disabled = false;
@@ -4387,7 +4390,6 @@
 				: "No files were processed successfully.";
 
 			renderBatchResults();
-			if (successful.length) scheduleFeedbackPrompt(state.mode);
 		}
 
 		const FEEDBACK_COOLDOWN_KEY = "uos-compressor-feedback-dismissed-at-v2";
