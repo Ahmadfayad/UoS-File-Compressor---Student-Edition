@@ -60,3 +60,7 @@ The password stays on the server. Hashed random sessions use a Secure, HttpOnly,
 `ADMIN_ACCESS_KEY` is no longer used. Configure Preview credentials only if Preview should access feedback. CSV formula-like values are neutralized; Excel comments are stored as text.
 
 Automatic prompting is limited to once per browser per service every 24 hours after dismissal; successful submissions are also limited per service per browser every 24 hours. Clearing browser storage can reset these client-side limits. The API validates fields, enforces same-origin requests, limits payload size, and includes a honeypot field; it does not store IP addresses.
+
+## Authorized users
+
+The owner configured in Vercel can add authorized users at /admin.html with an email and a unique password of at least 16 characters. Added users can read and export feedback but cannot manage accounts. Passwords are stored as salted scrypt hashes in Neon, never returned by the API. Owner controls allow password reset, restore, and revoke. Reset or revoke immediately invalidates that user's existing sessions. New users are not automatically emailed; share credentials privately. Apply the complete admin-schema.sql for the users table and session email column. The owner credentials remain in Vercel.

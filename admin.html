@@ -20,13 +20,20 @@
 <div class="actions"><button id="preview" type="submit">Show feedback</button><button class="secondary" id="csv" type="button">Download CSV</button><button class="secondary" id="xlsx" type="button">Download Excel (.xlsx)</button></div></form>
 <p id="report-status" class="status" role="status" aria-live="polite"></p></section>
 <section class="panel"><h2>Matching feedback</h2><p id="summary" class="summary"></p><p id="range" class="notice"></p><div class="table-wrap"><table><thead><tr><th>ID</th><th>Submitted</th><th>Rating</th><th>Service</th><th>Comment</th></tr></thead><tbody id="rows"></tbody></table></div></section>
+<section id="users-panel" class="panel" hidden>
+<h2>Authorized users</h2><p>Add people who may view and export feedback. Only the owner can manage accounts.</p>
+<form id="user-form"><div class="dates"><div><label for="user-email">User email address</label><input id="user-email" type="email" autocomplete="off" required maxlength="254"></div><div><label for="user-password">New user password</label><input id="user-password" type="password" autocomplete="new-password" minlength="16" maxlength="256" required></div></div>
+<div class="actions"><button id="add-user" type="submit">Add authorized user</button><button id="reset-user" type="button" class="secondary">Reset password / restore access</button></div></form>
+<p class="notice">Choose a unique password with at least 16 characters. Share credentials privately with the intended user. Passwords cannot be viewed after saving.</p>
+<p id="users-status" class="status" role="status" aria-live="polite"></p><div class="table-wrap"><table><thead><tr><th>Email</th><th>Access</th><th>Added</th><th>Actions</th></tr></thead><tbody id="user-rows"></tbody></table></div>
+</section>
 </div></main><script>
 (()=>{
 const $=id=>document.getElementById(id);
 const today=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Dubai',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
 for(const id of ['anchor','from','to'])$(id).value=today;
 let busy=false;
-function loginView(){ $('dashboard').hidden=true;$('login-panel').hidden=false;$('rows').replaceChildren();$('password').value=''; }
+function loginView(){ $('dashboard').hidden=true;$('login-panel').hidden=false;$('rows').replaceChildren();$('password').value='';$('user-password').value='';$('users-panel').hidden=true;$('user-rows').replaceChildren(); }
 async function request(url,options){const response=await fetch(url,{credentials:'same-origin',...options});if(!response.ok){const data=await response.json().catch(()=>({}));if(response.status===401)loginView();throw new Error(data.error||'Request failed ('+response.status+').');}return response;}
 function status(id,text,error=false){$(id).textContent=text;$(id).className='status'+(error?' error':'');}
 function filters(format){const p=new URLSearchParams({period:$('period').value,mode:$('mode').value,timezone:$('timezone').value,format});if($('period').value==='custom'){p.set('from',$('from').value);p.set('to',$('to').value);}else if($('period').value!=='all')p.set('anchor',$('anchor').value);return p;}
@@ -39,10 +46,29 @@ const count=data.rows.length,avg=count?(data.rows.reduce((sum,row)=>sum+Number(r
 $('range').textContent=data.bounds.start?'From '+new Date(data.bounds.start).toLocaleString('en-GB',{timeZone:data.timezone})+' to '+new Date(new Date(data.bounds.end).getTime()-1).toLocaleString('en-GB',{timeZone:data.timezone})+' ('+data.timezone+')':'All dates';status('report-status',count?'Feedback loaded.':'No feedback matches these filters.');
 }else{const blob=await response.blob(),url=URL.createObjectURL(blob),link=document.createElement('a');link.href=url;link.download=response.headers.get('Content-Disposition')?.match(/filename="([^"]+)"/)?.[1]||'customer-feedback.'+format;document.body.appendChild(link);link.click();link.remove();setTimeout(()=>URL.revokeObjectURL(url),10000);status('report-status','Your '+(format==='xlsx'?'Excel':'CSV')+' export is ready.');}}
 catch(error){status('report-status',error.message,true);if($('dashboard').hidden)status('login-status',error.message,true);}finally{setBusy(false);}}
-async function signedIn(email){$('login-panel').hidden=true;$('dashboard').hidden=false;$('signed-in').textContent='Signed in as '+email;$('password').value='';await report('json');}
-$('login-form').addEventListener('submit',async event=>{event.preventDefault();$('sign-in').disabled=true;status('login-status','Signing in...');try{const response=await request('/api/admin-session',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email:$('email').value,password:$('password').value})});await signedIn((await response.json()).email);}catch(error){status('login-status',error.message,true);}finally{$('password').value='';$('sign-in').disabled=false;}});
+async function signedIn(email,owner){$('login-panel').hidden=true;$('dashboard').hidden=false;$('signed-in').textContent='Signed in as '+email;$('password').value='';$('users-panel').hidden=!owner;await report('json');if(owner)await loadUsers();}
+$('login-form').addEventListener('submit',async event=>{event.preventDefault();$('sign-in').disabled=true;status('login-status','Signing in...');try{const response=await request('/api/admin-session',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email:$('email').value,password:$('password').value})});const user=await response.json();await signedIn(user.email,user.owner);}catch(error){status('login-status',error.message,true);}finally{$('password').value='';$('sign-in').disabled=false;}});
 $('sign-out').addEventListener('click',async()=>{try{await request('/api/admin-session',{method:'DELETE'});loginView();status('login-status','Signed out.');}catch(error){status('report-status',error.message,true);}});
 $('period').addEventListener('change',toggleDates);$('filters-form').addEventListener('submit',event=>{event.preventDefault();report('json');});$('csv').addEventListener('click',()=>report('csv'));$('xlsx').addEventListener('click',()=>report('xlsx'));toggleDates();
-(async()=>{try{const response=await fetch('/api/admin-session',{credentials:'same-origin'});if(response.ok)await signedIn((await response.json()).email);else if(response.status!==401){const data=await response.json();status('login-status',data.error,true);}}catch{status('login-status','Unable to connect. Please try again.',true);}})();
+(async()=>{try{const response=await fetch('/api/admin-session',{credentials:'same-origin'});if(response.ok){const user=await response.json();await signedIn(user.email,user.owner);}else if(response.status!==401){const data=await response.json();status('login-status',data.error,true);}}catch{status('login-status','Unable to connect. Please try again.',true);}})();
+
+async function loadUsers(){
+ try{const data=await (await request('/api/admin-users')).json();$('user-rows').replaceChildren();
+ for(const user of data.users){const tr=document.createElement('tr');for(const value of [user.email,user.active?'Active':'Revoked',new Date(user.created_at).toLocaleDateString('en-GB')]){const td=document.createElement('td');td.textContent=value;tr.appendChild(td);}
+ const td=document.createElement('td'),reset=document.createElement('button');reset.type='button';reset.className='secondary';reset.textContent='Reset / restore';reset.addEventListener('click',()=>{$('user-email').value=user.email;$('user-password').focus();status('users-status','Enter a new password above, then choose Reset password / restore access.');});td.appendChild(reset);
+ if(user.active){const revoke=document.createElement('button');revoke.type='button';revoke.className='secondary';revoke.textContent='Revoke access';revoke.addEventListener('click',async()=>{if(!confirm('Revoke feedback access for '+user.email+'?'))return;revoke.disabled=true;try{await request('/api/admin-users',{method:'DELETE',headers:{'Content-Type':'application/json'},body:JSON.stringify({email:user.email})});status('users-status','Access revoked for '+user.email+'.');await loadUsers();}catch(error){status('users-status',error.message,true);revoke.disabled=false;}});td.appendChild(revoke);}
+ tr.appendChild(td);$('user-rows').appendChild(tr);}
+ }catch(error){status('users-status',error.message,true);}
+}
+async function saveUser(method){
+ if(!$('user-form').reportValidity())return;
+ if(method==='PATCH'&&!confirm('Reset the password and enable access for '+$('user-email').value+'? Existing sessions will stop working.'))return;
+ $('add-user').disabled=$('reset-user').disabled=true;status('users-status','Saving account...');
+ try{const response=await request('/api/admin-users',{method,headers:{'Content-Type':'application/json'},body:JSON.stringify({email:$('user-email').value,password:$('user-password').value})});status('users-status',(await response.json()).message);$('user-email').value='';await loadUsers();}
+ catch(error){status('users-status',error.message,true);}
+ finally{$('user-password').value='';$('add-user').disabled=$('reset-user').disabled=false;}
+}
+$('user-form').addEventListener('submit',event=>{event.preventDefault();saveUser('POST');});$('reset-user').addEventListener('click',()=>saveUser('PATCH'));
+
 })();
 </script></body></html>
