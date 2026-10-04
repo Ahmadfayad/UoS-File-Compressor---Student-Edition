@@ -4394,29 +4394,38 @@
 			renderBatchResults();
 		}
 
-		const FEEDBACK_COOLDOWN_KEY = "uos-compressor-feedback-dismissed-at-v2";
-		const FEEDBACK_SUBMITTED_KEY = "uos-compressor-feedback-submitted-at-v1";
+		const FEEDBACK_COOLDOWN_KEY = "uos-compressor-feedback-dismissed-at-v3";
+		const FEEDBACK_SUBMITTED_KEY = "uos-compressor-feedback-submitted-at-v2";
 		const FEEDBACK_COOLDOWN_MS = 24 * 60 * 60 * 1000;
+		const FEEDBACK_MODES = new Set(["compress", "convert", "merge", "split"]);
 
-		function feedbackIsOnCooldown() {
+		function getFeedbackMode(mode = state.mode) {
+			return FEEDBACK_MODES.has(mode) ? mode : "compress";
+		}
+
+		function getFeedbackStorageKey(prefix, mode = state.feedback.mode || state.mode) {
+			return `${prefix}-${getFeedbackMode(mode)}`;
+		}
+
+		function feedbackIsOnCooldown(mode) {
 			try {
-				const lastPrompt = Number(localStorage.getItem(FEEDBACK_COOLDOWN_KEY));
+				const lastPrompt = Number(localStorage.getItem(getFeedbackStorageKey(FEEDBACK_COOLDOWN_KEY, mode)));
 				return Number.isFinite(lastPrompt) && Date.now() - lastPrompt < FEEDBACK_COOLDOWN_MS;
 			} catch (error) {
 				return false;
 			}
 		}
 
-		function markFeedbackPrompted() {
+		function markFeedbackPrompted(mode) {
 			try {
-				localStorage.setItem(FEEDBACK_COOLDOWN_KEY, String(Date.now()));
+				localStorage.setItem(getFeedbackStorageKey(FEEDBACK_COOLDOWN_KEY, mode), String(Date.now()));
 			} catch (error) {
 			}
 		}
 
-		function feedbackWasSubmittedToday() {
+		function feedbackWasSubmittedToday(mode) {
 			try {
-				const submittedAt = Number(localStorage.getItem(FEEDBACK_SUBMITTED_KEY));
+				const submittedAt = Number(localStorage.getItem(getFeedbackStorageKey(FEEDBACK_SUBMITTED_KEY, mode)));
 				return Number.isFinite(submittedAt) && Date.now() - submittedAt < FEEDBACK_COOLDOWN_MS;
 			} catch (error) {
 				return false;
@@ -4424,22 +4433,24 @@
 		}
 
 		function scheduleFeedbackPrompt(mode) {
-			if (feedbackIsOnCooldown() || feedbackWasSubmittedToday() || state.feedback.open) return;
+			const feedbackMode = getFeedbackMode(mode);
+			if (feedbackIsOnCooldown(feedbackMode) || feedbackWasSubmittedToday(feedbackMode) || state.feedback.open) return;
 			clearTimeout(state.feedback.timer);
-			state.feedback.mode = mode;
+			state.feedback.mode = feedbackMode;
 			state.feedback.timer = setTimeout(() => {
 				const resultVisible = $("result-section").classList.contains("visible");
-				if (state.mode === mode && resultVisible && !feedbackIsOnCooldown() && !feedbackWasSubmittedToday()) openFeedbackDialog();
+				if (state.mode === feedbackMode && resultVisible && !feedbackIsOnCooldown(feedbackMode) && !feedbackWasSubmittedToday(feedbackMode)) openFeedbackDialog();
 			}, 350);
 		}
 
 		function openFeedbackDialog(manual = false) {
-			if ((!manual && feedbackIsOnCooldown()) || state.feedback.open) return;
-			state.feedback.mode = MODE_CONFIG[state.mode] ? state.mode : "compress";
+			const feedbackMode = getFeedbackMode();
+			if ((!manual && feedbackIsOnCooldown(feedbackMode)) || state.feedback.open) return;
+			state.feedback.mode = feedbackMode;
 			state.feedback.rating = 0;
 			state.feedback.open = true;
 			state.feedback.previousFocus = document.activeElement;
-			const alreadySubmitted = feedbackWasSubmittedToday();
+			const alreadySubmitted = feedbackWasSubmittedToday(feedbackMode);
 			$("feedback-form").hidden = alreadySubmitted;
 			$("feedback-success").hidden = !alreadySubmitted;
 			if (alreadySubmitted) {
@@ -4468,7 +4479,7 @@
 			if (!state.feedback.open) return;
 			state.feedback.open = false;
 			$("feedback-overlay").hidden = true;
-			if (recordDismissal) markFeedbackPrompted();
+			if (recordDismissal) markFeedbackPrompted(state.feedback.mode);
 			if (state.feedback.previousFocus?.isConnected) state.feedback.previousFocus.focus();
 		}
 
@@ -4514,9 +4525,9 @@
 								: typeof payload?.error === "string" ? payload.error : "Feedback submission failed.";
 					throw new Error(serverMessage);
 				}
-				markFeedbackPrompted();
+				markFeedbackPrompted(state.feedback.mode);
 				try {
-					localStorage.setItem(FEEDBACK_SUBMITTED_KEY, String(Date.now()));
+					localStorage.setItem(getFeedbackStorageKey(FEEDBACK_SUBMITTED_KEY, state.feedback.mode), String(Date.now()));
 				} catch (storageError) {
 				}
 				$("feedback-form").hidden = true;

@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8" />
+	<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+	<meta name="color-scheme" content="light" />
+	<meta name="robots" content="noindex, nofollow" />
+	<title>Feedback Admin | UoS File Compressor</title>
+	<style>
+		:root {
+			font-family: "Segoe UI", Arial, sans-serif;
+			color: #17251a;
+			background: #f1f6f0;
+			font-synthesis: none;
+		}
+
+		* { box-sizing: border-box; }
+		body { min-height: 100vh; margin: 0; background: linear-gradient(135deg, #eef5ed, #f8faf5 58%, #edf2eb); }
+		main { width: min(100% - 32px, 780px); margin: 56px auto; }
+		header { display: flex; justify-content: space-between; align-items: end; gap: 16px; margin-bottom: 28px; }
+		.eyebrow { margin: 0 0 8px; color: #397346; font-size: 11px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
+		h1 { margin: 0; font-size: 28px; line-height: 1.2; }
+		.subtitle { margin: 8px 0 0; color: #657368; font-size: 14px; line-height: 1.5; }
+		.status { min-height: 20px; margin: 12px 0 0; color: #617364; font-size: 13px; }
+		.status.error { color: #b42318; }
+		.status.success { color: #236334; }
+		.panel { padding: 24px; border: 1px solid rgba(23, 79, 35, .12); border-radius: 12px; background: rgba(255,255,255,.92); box-shadow: 0 16px 42px rgba(29, 54, 32, .08); }
+		.panel + .panel { margin-top: 16px; }
+		.panel h2 { margin: 0 0 8px; font-size: 17px; }
+		.panel > p { margin: 0 0 18px; color: #657368; font-size: 13px; line-height: 1.5; }
+		label { display: block; margin: 0 0 7px; color: #344638; font-size: 12px; font-weight: 700; }
+		input, select { width: 100%; min-height: 42px; padding: 9px 11px; border: 1px solid #cbd7cc; border-radius: 7px; background: #fff; color: #17251a; font: inherit; font-size: 13px; }
+		input:focus-visible, select:focus-visible, button:focus-visible { outline: 2px solid #62a570; outline-offset: 2px; }
+		button { min-height: 42px; padding: 0 16px; border: 0; border-radius: 7px; background: #174f23; color: #fff; font: inherit; font-size: 13px; font-weight: 700; cursor: pointer; }
+		button:hover { background: #216331; }
+		button:disabled { cursor: progress; opacity: .65; }
+		button.secondary { border: 1px solid #cbd7cc; background: #fff; color: #405345; }
+		button.secondary:hover { background: #f5f8f4; }
+		.row { display: grid; grid-template-columns: 1fr auto; align-items: end; gap: 12px; }
+		.filters { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+		.field { min-width: 0; }
+		#custom-dates[hidden] { display: none; }
+		.actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 10px; margin-top: 20px; }
+		.notice { margin-top: 16px; padding: 12px 14px; border-left: 3px solid #c5960c; background: #fff9e8; color: #62552e; font-size: 12px; line-height: 1.5; }
+		[hidden] { display: none !important; }
+		@media (max-width: 560px) {
+			main { margin: 28px auto; }
+			header { align-items: start; flex-direction: column; }
+			.panel { padding: 18px; }
+			.row, .filters { grid-template-columns: 1fr; }
+			.row button { width: 100%; }
+			.actions { flex-direction: column-reverse; }
+			.actions button { width: 100%; }
+		}
+	</style>
+</head>
+<body>
+	<main>
+		<header>
+			<div>
+				<p class="eyebrow">University of Sharjah</p>
+				<h1>Customer feedback</h1>
+				<p class="subtitle">Authorized export of service ratings and comments.</p>
+			</div>
+		</header>
+
+		<section class="panel" aria-labelledby="access-title">
+			<h2 id="access-title">Admin access</h2>
+			<p>Enter the admin access key configured for this Vercel project. The key is held only for this page session.</p>
+			<form id="access-form" class="row">
+				<div class="field">
+					<label for="admin-key">Admin access key</label>
+					<input id="admin-key" type="password" autocomplete="current-password" required />
+				</div>
+				<button id="connect-button" type="submit">Connect</button>
+			</form>
+			<p class="status" id="access-status" role="status" aria-live="polite"></p>
+		</section>
+
+		<section class="panel" id="export-panel" aria-labelledby="export-title" hidden>
+			<h2 id="export-title">Export feedback</h2>
+			<p>Download a CSV file for spreadsheet or KPI analysis. Comments are included as submitted.</p>
+			<form id="export-form">
+				<div class="filters">
+					<div class="field">
+						<label for="period">Date period</label>
+						<select id="period">
+							<option value="all">All records</option>
+							<option value="week">Current week</option>
+							<option value="month">Current month</option>
+							<option value="year">Current year</option>
+							<option value="custom">Custom date range</option>
+						</select>
+					</div>
+					<div class="field">
+						<label for="service">Service</label>
+						<select id="service">
+							<option value="all">All services</option>
+							<option value="compress">Compress</option>
+							<option value="convert">Convert</option>
+							<option value="merge">Merge</option>
+							<option value="split">Split</option>
+						</select>
+					</div>
+				</div>
+				<div class="filters" id="custom-dates" hidden>
+					<div class="field">
+						<label for="date-from">From</label>
+						<input id="date-from" type="date" />
+					</div>
+					<div class="field">
+						<label for="date-to">Through</label>
+						<input id="date-to" type="date" />
+					</div>
+				</div>
+				<div class="notice">Date periods use UTC. Custom dates include both selected calendar days.</div>
+				<p class="status" id="export-status" role="status" aria-live="polite"></p>
+				<div class="actions">
+					<button class="secondary" id="lock-button" type="button">Lock admin page</button>
+					<button id="export-button" type="submit">Download CSV</button>
+				</div>
+			</form>
+		</section>
+	</main>
+
+	<script>
+		(() => {
+			let adminKey = '';
+			const accessForm = document.getElementById('access-form');
+			const exportForm = document.getElementById('export-form');
+			const accessStatus = document.getElementById('access-status');
+			const exportStatus = document.getElementById('export-status');
+			const exportPanel = document.getElementById('export-panel');
+			const connectButton = document.getElementById('connect-button');
+			const exportButton = document.getElementById('export-button');
+			const period = document.getElementById('period');
+			const customDates = document.getElementById('custom-dates');
+
+			async function readError(response) {
+				const payload = await response.json().catch(() => null);
+				return typeof payload?.error === 'string' ? payload.error : `Request failed (${response.status}).`;
+			}
+
+			period.addEventListener('change', () => {
+				customDates.hidden = period.value !== 'custom';
+			});
+
+			accessForm.addEventListener('submit', async (event) => {
+				event.preventDefault();
+				connectButton.disabled = true;
+				accessStatus.className = 'status';
+				accessStatus.textContent = 'Verifying access...';
+				const candidateKey = document.getElementById('admin-key').value;
+				try {
+					const response = await fetch('/api/admin-feedback?action=verify', {
+						headers: { Authorization: `Bearer ${candidateKey}` },
+					});
+					if (!response.ok) throw new Error(await readError(response));
+					adminKey = candidateKey;
+					document.getElementById('admin-key').value = '';
+					exportPanel.hidden = false;
+					accessForm.hidden = true;
+					accessStatus.textContent = '';
+					document.getElementById('export-title').focus();
+				} catch (error) {
+					accessStatus.classList.add('error');
+					accessStatus.textContent = error.message || 'Access could not be verified.';
+					connectButton.disabled = false;
+				}
+			});
+
+			exportForm.addEventListener('submit', async (event) => {
+				event.preventDefault();
+				exportButton.disabled = true;
+				exportButton.textContent = 'Preparing export...';
+				exportStatus.className = 'status';
+				exportStatus.textContent = '';
+				const params = new URLSearchParams({
+					period: period.value,
+					mode: document.getElementById('service').value,
+				});
+				if (period.value === 'custom') {
+					params.set('from', document.getElementById('date-from').value);
+					params.set('to', document.getElementById('date-to').value);
+				}
+				try {
+					const response = await fetch(`/api/admin-feedback?${params}`, {
+						headers: { Authorization: `Bearer ${adminKey}` },
+					});
+					if (!response.ok) throw new Error(await readError(response));
+					const blob = await response.blob();
+					const disposition = response.headers.get('Content-Disposition') || '';
+					const filename = disposition.match(/filename="([^"]+)"/)?.[1] || 'customer-feedback.csv';
+					const url = URL.createObjectURL(blob);
+					const link = document.createElement('a');
+					link.href = url;
+					link.download = filename;
+					document.body.appendChild(link);
+					link.click();
+					link.remove();
+					setTimeout(() => URL.revokeObjectURL(url), 10000);
+					exportStatus.classList.add('success');
+					exportStatus.textContent = 'Your CSV export is ready.';
+				} catch (error) {
+					exportStatus.classList.add('error');
+					exportStatus.textContent = error.message || 'The export could not be generated.';
+				} finally {
+					exportButton.disabled = false;
+					exportButton.textContent = 'Download CSV';
+				}
+			});
+
+			document.getElementById('lock-button').addEventListener('click', () => {
+				adminKey = '';
+				exportPanel.hidden = true;
+				accessForm.hidden = false;
+				connectButton.disabled = false;
+				accessStatus.className = 'status';
+				accessStatus.textContent = 'Admin page locked.';
+				document.getElementById('admin-key').focus();
+			});
+		})();
+	</script>
+</body>
+</html>

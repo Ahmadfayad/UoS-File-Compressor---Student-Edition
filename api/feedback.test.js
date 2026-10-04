@@ -4,6 +4,8 @@ const assert = require('node:assert/strict');
 const test = require('node:test');
 const handler = require('./feedback');
 const { sendFeedbackNotification } = handler;
+const adminHandler = require('./admin-feedback');
+const { getDateBounds, makeCsv } = adminHandler;
 
 async function invoke({ method = 'POST', body = {}, origin = 'https://example.test', host = 'example.test' } = {}) {
 	const req = { method, body, headers: { origin, host } };
@@ -130,4 +132,115 @@ test('keeps email provider failures non-fatal', async () => {
 		if (previous.recipient !== undefined) process.env.FEEDBACK_NOTIFICATION_EMAIL = previous.recipient; else delete process.env.FEEDBACK_NOTIFICATION_EMAIL;
 		if (previous.sender !== undefined) process.env.FEEDBACK_FROM_EMAIL = previous.sender; else delete process.env.FEEDBACK_FROM_EMAIL;
 	}
+});
+
+async function invokeAdmin({ method = 'GET', authorization = '', query = {}, origin = 'https://example.test', host = 'example.test' } = {}) {
+	const req = { method, query, headers: { authorization, origin, host } };
+	const res = {
+		statusCode: 200,
+		headers: {},
+		setHeader(name, value) { this.headers[name] = value; },
+		status(code) { this.statusCode = code; return this; },
+		json(payload) { this.payload = payload; return this; },
+		end() { this.ended = true; return this; },
+		send(payload) { this.payload = payload; return this; },
+	};
+	await adminHandler(req, res);
+	return res;
+}
+
+test('admin export fails closed when its access key is not configured', async () => {
+	const previousKey = process.env.ADMIN_ACCESS_KEY;
+	delete process.env.ADMIN_ACCESS_KEY;
+	try {
+		const response = await invokeAdmin();
+		assert.equal(response.statusCode, 503);
+		assert.deepEqual(response.payload, { error: 'Admin export is not configured.' });
+	} finally {
+		if (previousKey !== undefined) process.env.ADMIN_ACCESS_KEY = previousKey;
+	}
+});
+
+test('admin export rejects invalid keys and cross-origin access', async () => {
+	const previousKey = process.env.ADMIN_ACCESS_KEY;
+	process.env.ADMIN_ACCESS_KEY = 'a'.repeat(48);
+	try {
+		const invalidKey = await invokeAdmin({ authorization: `Bearer ${'b'.repeat(48)}` });
+		assert.equal(invalidKey.statusCode, 401);
+		const crossOrigin = await invokeAdmin({ authorization: `Bearer ${process.env.ADMIN_ACCESS_KEY}`, origin: 'https://attacker.test' });
+		assert.equal(crossOrigin.statusCode, 403);
+	} finally {
+		if (previousKey !== undefined) process.env.ADMIN_ACCESS_KEY = previousKey; else delete process.env.ADMIN_ACCESS_KEY;
+	}
+});
+
+test('admin export verifies a valid key without reading feedback data', async () => {
+	const previousKey = process.env.ADMIN_ACCESS_KEY;
+	process.env.ADMIN_ACCESS_KEY = 'c'.repeat(48);
+	try {
+		const response = await invokeAdmin({ authorization: `Bearer ${process.env.ADMIN_ACCESS_KEY}`, query: { action: 'verify' } });
+		assert.equal(response.statusCode, 204);
+		assert.equal(response.ended, true);
+	} finally {
+		if (previousKey !== undefined) process.env.ADMIN_ACCESS_KEY = previousKey; else delete process.env.ADMIN_ACCESS_KEY;
+	}
+});
+
+test('admin export rejects invalid periods and service filters', async () => {
+	const previousKey = process.env.ADMIN_ACCESS_KEY;
+	process.env.ADMIN_ACCESS_KEY = 'd'.repeat(48);
+	try {
+		const authorization = `Bearer ${process.env.ADMIN_ACCESS_KEY}`;
+		const invalidPeriod = await invokeAdmin({ authorization, query: { period: 'decade' } });
+		assert.equal(invalidPeriod.statusCode, 400);
+		assert.deepEqual(invalidPeriod.payload, { error: 'Invalid export period.' });
+		const invalidService = await invokeAdmin({ authorization, query: { period: 'all', mode: 'unknown' } });
+		assert.equal(invalidService.statusCode, 400);
+		assert.deepEqual(invalidService.payload, { error: 'Invalid service filter.' });
+	} finally {
+		if (previousKey !== undefined) process.env.ADMIN_ACCESS_KEY = previousKey; else delete process.env.ADMIN_ACCESS_KEY;
+	}
+});
+
+test('admin export reports when Neon storage is not configured', async () => {
+	const previous = { key: process.env.ADMIN_ACCESS_KEY, databaseUrl: process.env.DATABASE_URL };
+	process.env.ADMIN_ACCESS_KEY = 'e'.repeat(48);
+	delete process.env.DATABASE_URL;
+	try {
+		const response = await invokeAdmin({
+			authorization: `Bearer ${process.env.ADMIN_ACCESS_KEY}`,
+			query: { period: 'all', mode: 'all' },
+		});
+		assert.equal(response.statusCode, 503);
+		assert.deepEqual(response.payload, { error: 'Feedback storage is not configured.' });
+	} finally {
+		if (previous.key !== undefined) process.env.ADMIN_ACCESS_KEY = previous.key; else delete process.env.ADMIN_ACCESS_KEY;
+		if (previous.databaseUrl !== undefined) process.env.DATABASE_URL = previous.databaseUrl; else delete process.env.DATABASE_URL;
+	}
+});
+
+test('admin date bounds cover UTC week, month, year, and inclusive custom days', () => {
+	const now = new Date('2026-10-04T15:00:00.000Z');
+	assert.deepEqual(getDateBounds('week', undefined, undefined, now), {
+		start: '2026-09-28T00:00:00.000Z',
+		end: '2026-10-05T00:00:00.000Z',
+	});
+	assert.deepEqual(getDateBounds('month', undefined, undefined, now), {
+		start: '2026-10-01T00:00:00.000Z',
+		end: '2026-11-01T00:00:00.000Z',
+	});
+	assert.deepEqual(getDateBounds('year', undefined, undefined, now), {
+		start: '2026-01-01T00:00:00.000Z',
+		end: '2027-01-01T00:00:00.000Z',
+	});
+	assert.deepEqual(getDateBounds('custom', '2026-10-02', '2026-10-04'), {
+		start: '2026-10-02T00:00:00.000Z',
+		end: '2026-10-05T00:00:00.000Z',
+	});
+	assert.ok(getDateBounds('custom', '2026-10-05', '2026-10-04').error);
+});
+
+test('CSV export quotes fields and neutralizes spreadsheet formulas', () => {
+	const csv = makeCsv([{ id: 1, created_at: '2026-10-04T00:00:00Z', rating: 2, tool_mode: 'compress', comment: '=HYPERLINK("https://example.test")' }]);
+	assert.equal(csv.split('\r\n')[1], "\"1\",\"2026-10-04T00:00:00Z\",\"2\",\"compress\",\"'=HYPERLINK(\"\"https://example.test\"\")\"");
 });

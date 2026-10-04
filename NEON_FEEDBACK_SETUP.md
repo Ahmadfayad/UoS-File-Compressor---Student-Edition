@@ -1,6 +1,6 @@
 # Customer Feedback Setup
 
-The feedback dialog appears shortly after a successful download, unless that browser dismissed the automatic survey within the last 24 hours. The fixed bottom-corner **Share feedback** button is always available. After a successful submission, that browser cannot submit another rating for 24 hours; reopening the survey shows a friendly confirmation instead. These cooldowns are stored per browser in local storage.
+The feedback dialog appears shortly after a successful download, unless that browser dismissed the automatic survey for that service within the last 24 hours. The fixed bottom-corner **Share feedback** button is always available. A successful submission is limited to once per service per 24 hours in that browser; for example, a Compress rating does not prevent a Convert rating later that day. Reopening a service's survey during its cooldown shows a friendly confirmation instead. These experience-level cooldowns are stored per browser in local storage; they are not identity-based abuse prevention.
 
 The survey submits only the star rating, optional comment, and tool mode. Files are not sent to the feedback endpoint. Vercel Web Analytics remains a separate project-level integration.
 
@@ -46,4 +46,14 @@ GROUP BY tool_mode, rating
 ORDER BY tool_mode, rating;
 ```
 
-Automatic prompting is limited to once per browser every 24 hours after dismissal. Successful submissions are also limited to once per browser every 24 hours. This is a user-experience guard, not a strong identity-based or server-side abuse guarantee; clearing browser storage can reset it. The API validates fields, enforces same-origin requests, limits payload size, and includes a honeypot field; it does not store IP addresses.
+## Admin CSV Export
+
+The admin page is available at `/admin.html`. It supports all records, the current UTC week/month/year, or an inclusive custom date range, with an optional service filter. Exported CSV includes the feedback ID, timestamp, rating, service, and comment. Formula-like comment values are neutralized for spreadsheet safety.
+
+1. Generate a high-entropy access key locally, for example with `node -e "console.log(require('crypto').randomBytes(32).toString('base64url'))"`.
+2. In Vercel Project Settings > Environment Variables, add `ADMIN_ACCESS_KEY` for Production. Use the generated value directly in Vercel; do not paste it into this repository, the browser, or a chat.
+3. Redeploy, then visit `https://uos-file-compressor.vercel.app/admin.html` and enter the key. It is kept only in memory for that page session; use **Lock admin page** or close the page to clear it.
+
+Treat the admin key like a password and rotate it in Vercel if it is disclosed. The key grants read/export access to feedback, including optional comments. Consider restricting the deployment with Vercel access controls if the admin page should be private to an organization.
+
+Automatic prompting is limited to once per browser per service every 24 hours after dismissal; successful submissions are also limited per service per browser every 24 hours. Clearing browser storage can reset these client-side limits. The API validates fields, enforces same-origin requests, limits payload size, and includes a honeypot field; it does not store IP addresses.
