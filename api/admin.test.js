@@ -60,6 +60,16 @@ assert.ok(bounds('month',null,null,new Date(),'Asia/Dubai','2024-02-30').error);
 
 
 const manager=require('./admin-users');
+test('password policy accepts six characters and rejects five for owner and users',async()=>{
+ const previous=process.env.ADMIN_PASSWORD;
+ try{process.env.ADMIN_PASSWORD='abcde';assert.equal(auth.config(),null);process.env.ADMIN_PASSWORD='abcdef';assert.ok(auth.config());
+ attempts=0;const login=await invoke(session,req('POST',{email:'admin@example.test',password:'abcdef'}));assert.equal(login.statusCode,200);
+ const cookie=login.headers['Set-Cookie'].split(';')[0];
+ assert.equal((await invoke(manager,req('POST',{email:'six@example.test',password:'abcde'},cookie))).statusCode,400);
+ assert.equal((await invoke(manager,req('POST',{email:'six@example.test',password:'abcdef'},cookie))).statusCode,201);
+ assert.equal((await invoke(session,req('POST',{email:'six@example.test',password:'abcdef'}))).statusCode,200);
+ }finally{process.env.ADMIN_PASSWORD=previous;}
+});
 test('only owner can create, reset and revoke accounts; passwords hashed and sessions invalidated',async()=>{
 attempts=0;
 const login=await invoke(session,req('POST',{email:'admin@example.test',password:process.env.ADMIN_PASSWORD})),ownerCookie=login.headers['Set-Cookie'].split(';')[0];

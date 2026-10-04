@@ -19,7 +19,7 @@ module.exports=async function(req,res){
  await sql`UPDATE public.feedback_admin_users SET active=FALSE WHERE email=${email}`;
  return res.status(200).json({message:'Access revoked.'});
  }
- if(typeof body.password!=='string'||body.password.length<16||body.password.length>256)return res.status(400).json({error:'Use a unique password of 16–256 characters.'});
+ if(typeof body.password!=='string'||body.password.length<6||body.password.length>256)return res.status(400).json({error:'Use a unique password of 6–256 characters.'});
  const {salt,digest}=auth.passwordRecord(body.password);
  if(req.method==='POST'){
  const rows=await sql`INSERT INTO public.feedback_admin_users(email,password_hash,password_salt) VALUES(${email},${digest},${salt}) ON CONFLICT(email) DO NOTHING RETURNING email`;

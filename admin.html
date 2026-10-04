@@ -22,9 +22,9 @@
 <section class="panel"><h2>Matching feedback</h2><p id="summary" class="summary"></p><p id="range" class="notice"></p><div class="table-wrap"><table><thead><tr><th>ID</th><th>Submitted</th><th>Rating</th><th>Service</th><th>Comment</th></tr></thead><tbody id="rows"></tbody></table></div></section>
 <section id="users-panel" class="panel" hidden>
 <h2>Authorized users</h2><p>Add people who may view and export feedback. Only the owner can manage accounts.</p>
-<form id="user-form"><div class="dates"><div><label for="user-email">User email address</label><input id="user-email" type="email" autocomplete="off" required maxlength="254"></div><div><label for="user-password">New user password</label><input id="user-password" type="password" autocomplete="new-password" minlength="16" maxlength="256" required></div></div>
+<form id="user-form"><div class="dates"><div><label for="user-email">User email address</label><input id="user-email" type="email" autocomplete="off" required maxlength="254"></div><div><label for="user-password">New user password</label><input id="user-password" type="password" autocomplete="new-password" minlength="6" maxlength="256" required></div></div>
 <div class="actions"><button id="add-user" type="submit">Add authorized user</button><button id="reset-user" type="button" class="secondary">Reset password / restore access</button></div></form>
-<p class="notice">Choose a unique password with at least 16 characters. Share credentials privately with the intended user. Passwords cannot be viewed after saving.</p>
+<p class="notice">Choose a unique password with at least 6 characters. Share credentials privately with the intended user. Passwords cannot be viewed after saving.</p>
 <p id="users-status" class="status" role="status" aria-live="polite"></p><div class="table-wrap"><table><thead><tr><th>Email</th><th>Access</th><th>Added</th><th>Actions</th></tr></thead><tbody id="user-rows"></tbody></table></div>
 </section>
 </div></main><script>

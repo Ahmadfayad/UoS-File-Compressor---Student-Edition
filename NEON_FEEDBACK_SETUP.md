@@ -52,7 +52,7 @@ The administrator page is `/admin.html`. Only the email configured in `ADMIN_EMA
 
 1. Run `admin-schema.sql` in the existing Neon database.
 2. Set `ADMIN_EMAIL` in Vercel for Production.
-3. Enter a unique password of 16–256 characters directly into a sensitive Production variable named `ADMIN_PASSWORD`. Never commit it, print it, or paste it into chat.
+3. Enter a unique password of 6–256 characters directly into a sensitive Production variable named `ADMIN_PASSWORD`. Never commit it, print it, or paste it into chat.
 4. Redeploy and sign in at `/admin.html`.
 
 The password stays on the server. Hashed random sessions use a Secure, HttpOnly, SameSite=Strict cookie and expire after four hours. Sign out revokes the session. Changing credentials and redeploying invalidates existing sessions. To reset a forgotten password, replace `ADMIN_PASSWORD` in Vercel and redeploy. There is no public registration. Sign-in attempts are limited per hashed IP and globally in separate admin tables. Feedback rows do not contain IP addresses.
@@ -63,4 +63,4 @@ Automatic prompting is limited to once per browser per service every 24 hours af
 
 ## Authorized users
 
-The owner configured in Vercel can add authorized users at /admin.html with an email and a unique password of at least 16 characters. Added users can read and export feedback but cannot manage accounts. Passwords are stored as salted scrypt hashes in Neon, never returned by the API. Owner controls allow password reset, restore, and revoke. Reset or revoke immediately invalidates that user's existing sessions. New users are not automatically emailed; share credentials privately. Apply the complete admin-schema.sql for the users table and session email column. The owner credentials remain in Vercel.
+The owner configured in Vercel can add authorized users at /admin.html with an email and a unique password of at least 6 characters. Added users can read and export feedback but cannot manage accounts. Passwords are stored as salted scrypt hashes in Neon, never returned by the API. Owner controls allow password reset, restore, and revoke. Reset or revoke immediately invalidates that user's existing sessions. New users are not automatically emailed; share credentials privately. Apply the complete admin-schema.sql for the users table and session email column. The owner credentials remain in Vercel.
