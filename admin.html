@@ -1,225 +1,48 @@
 <!DOCTYPE html>
-<html lang="en">
-<head>
-	<meta charset="UTF-8" />
-	<meta name="viewport" content="width=device-width, initial-scale=1.0" />
-	<meta name="color-scheme" content="light" />
-	<meta name="robots" content="noindex, nofollow" />
-	<title>Feedback Admin | UoS File Compressor</title>
-	<style>
-		:root {
-			font-family: "Segoe UI", Arial, sans-serif;
-			color: #17251a;
-			background: #f1f6f0;
-			font-synthesis: none;
-		}
-
-		* { box-sizing: border-box; }
-		body { min-height: 100vh; margin: 0; background: linear-gradient(135deg, #eef5ed, #f8faf5 58%, #edf2eb); }
-		main { width: min(100% - 32px, 780px); margin: 56px auto; }
-		header { display: flex; justify-content: space-between; align-items: end; gap: 16px; margin-bottom: 28px; }
-		.eyebrow { margin: 0 0 8px; color: #397346; font-size: 11px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
-		h1 { margin: 0; font-size: 28px; line-height: 1.2; }
-		.subtitle { margin: 8px 0 0; color: #657368; font-size: 14px; line-height: 1.5; }
-		.status { min-height: 20px; margin: 12px 0 0; color: #617364; font-size: 13px; }
-		.status.error { color: #b42318; }
-		.status.success { color: #236334; }
-		.panel { padding: 24px; border: 1px solid rgba(23, 79, 35, .12); border-radius: 12px; background: rgba(255,255,255,.92); box-shadow: 0 16px 42px rgba(29, 54, 32, .08); }
-		.panel + .panel { margin-top: 16px; }
-		.panel h2 { margin: 0 0 8px; font-size: 17px; }
-		.panel > p { margin: 0 0 18px; color: #657368; font-size: 13px; line-height: 1.5; }
-		label { display: block; margin: 0 0 7px; color: #344638; font-size: 12px; font-weight: 700; }
-		input, select { width: 100%; min-height: 42px; padding: 9px 11px; border: 1px solid #cbd7cc; border-radius: 7px; background: #fff; color: #17251a; font: inherit; font-size: 13px; }
-		input:focus-visible, select:focus-visible, button:focus-visible { outline: 2px solid #62a570; outline-offset: 2px; }
-		button { min-height: 42px; padding: 0 16px; border: 0; border-radius: 7px; background: #174f23; color: #fff; font: inherit; font-size: 13px; font-weight: 700; cursor: pointer; }
-		button:hover { background: #216331; }
-		button:disabled { cursor: progress; opacity: .65; }
-		button.secondary { border: 1px solid #cbd7cc; background: #fff; color: #405345; }
-		button.secondary:hover { background: #f5f8f4; }
-		.row { display: grid; grid-template-columns: 1fr auto; align-items: end; gap: 12px; }
-		.filters { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
-		.field { min-width: 0; }
-		#custom-dates[hidden] { display: none; }
-		.actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 10px; margin-top: 20px; }
-		.notice { margin-top: 16px; padding: 12px 14px; border-left: 3px solid #c5960c; background: #fff9e8; color: #62552e; font-size: 12px; line-height: 1.5; }
-		[hidden] { display: none !important; }
-		@media (max-width: 560px) {
-			main { margin: 28px auto; }
-			header { align-items: start; flex-direction: column; }
-			.panel { padding: 18px; }
-			.row, .filters { grid-template-columns: 1fr; }
-			.row button { width: 100%; }
-			.actions { flex-direction: column-reverse; }
-			.actions button { width: 100%; }
-		}
-	</style>
-</head>
-<body>
-	<main>
-		<header>
-			<div>
-				<p class="eyebrow">University of Sharjah</p>
-				<h1>Customer feedback</h1>
-				<p class="subtitle">Authorized export of service ratings and comments.</p>
-			</div>
-		</header>
-
-		<section class="panel" aria-labelledby="access-title">
-			<h2 id="access-title">Admin access</h2>
-			<p>Enter the admin access key configured for this Vercel project. The key is held only for this page session.</p>
-			<form id="access-form" class="row">
-				<div class="field">
-					<label for="admin-key">Admin access key</label>
-					<input id="admin-key" type="password" autocomplete="current-password" required />
-				</div>
-				<button id="connect-button" type="submit">Connect</button>
-			</form>
-			<p class="status" id="access-status" role="status" aria-live="polite"></p>
-		</section>
-
-		<section class="panel" id="export-panel" aria-labelledby="export-title" hidden>
-			<h2 id="export-title">Export feedback</h2>
-			<p>Download a CSV file for spreadsheet or KPI analysis. Comments are included as submitted.</p>
-			<form id="export-form">
-				<div class="filters">
-					<div class="field">
-						<label for="period">Date period</label>
-						<select id="period">
-							<option value="all">All records</option>
-							<option value="week">Current week</option>
-							<option value="month">Current month</option>
-							<option value="year">Current year</option>
-							<option value="custom">Custom date range</option>
-						</select>
-					</div>
-					<div class="field">
-						<label for="service">Service</label>
-						<select id="service">
-							<option value="all">All services</option>
-							<option value="compress">Compress</option>
-							<option value="convert">Convert</option>
-							<option value="merge">Merge</option>
-							<option value="split">Split</option>
-						</select>
-					</div>
-				</div>
-				<div class="filters" id="custom-dates" hidden>
-					<div class="field">
-						<label for="date-from">From</label>
-						<input id="date-from" type="date" />
-					</div>
-					<div class="field">
-						<label for="date-to">Through</label>
-						<input id="date-to" type="date" />
-					</div>
-				</div>
-				<div class="notice">Date periods use UTC. Custom dates include both selected calendar days.</div>
-				<p class="status" id="export-status" role="status" aria-live="polite"></p>
-				<div class="actions">
-					<button class="secondary" id="lock-button" type="button">Lock admin page</button>
-					<button id="export-button" type="submit">Download CSV</button>
-				</div>
-			</form>
-		</section>
-	</main>
-
-	<script>
-		(() => {
-			let adminKey = '';
-			const accessForm = document.getElementById('access-form');
-			const exportForm = document.getElementById('export-form');
-			const accessStatus = document.getElementById('access-status');
-			const exportStatus = document.getElementById('export-status');
-			const exportPanel = document.getElementById('export-panel');
-			const connectButton = document.getElementById('connect-button');
-			const exportButton = document.getElementById('export-button');
-			const period = document.getElementById('period');
-			const customDates = document.getElementById('custom-dates');
-
-			async function readError(response) {
-				const payload = await response.json().catch(() => null);
-				return typeof payload?.error === 'string' ? payload.error : `Request failed (${response.status}).`;
-			}
-
-			period.addEventListener('change', () => {
-				customDates.hidden = period.value !== 'custom';
-			});
-
-			accessForm.addEventListener('submit', async (event) => {
-				event.preventDefault();
-				connectButton.disabled = true;
-				accessStatus.className = 'status';
-				accessStatus.textContent = 'Verifying access...';
-				const candidateKey = document.getElementById('admin-key').value;
-				try {
-					const response = await fetch('/api/admin-feedback?action=verify', {
-						headers: { Authorization: `Bearer ${candidateKey}` },
-					});
-					if (!response.ok) throw new Error(await readError(response));
-					adminKey = candidateKey;
-					document.getElementById('admin-key').value = '';
-					exportPanel.hidden = false;
-					accessForm.hidden = true;
-					accessStatus.textContent = '';
-					document.getElementById('export-title').focus();
-				} catch (error) {
-					accessStatus.classList.add('error');
-					accessStatus.textContent = error.message || 'Access could not be verified.';
-					connectButton.disabled = false;
-				}
-			});
-
-			exportForm.addEventListener('submit', async (event) => {
-				event.preventDefault();
-				exportButton.disabled = true;
-				exportButton.textContent = 'Preparing export...';
-				exportStatus.className = 'status';
-				exportStatus.textContent = '';
-				const params = new URLSearchParams({
-					period: period.value,
-					mode: document.getElementById('service').value,
-				});
-				if (period.value === 'custom') {
-					params.set('from', document.getElementById('date-from').value);
-					params.set('to', document.getElementById('date-to').value);
-				}
-				try {
-					const response = await fetch(`/api/admin-feedback?${params}`, {
-						headers: { Authorization: `Bearer ${adminKey}` },
-					});
-					if (!response.ok) throw new Error(await readError(response));
-					const blob = await response.blob();
-					const disposition = response.headers.get('Content-Disposition') || '';
-					const filename = disposition.match(/filename="([^"]+)"/)?.[1] || 'customer-feedback.csv';
-					const url = URL.createObjectURL(blob);
-					const link = document.createElement('a');
-					link.href = url;
-					link.download = filename;
-					document.body.appendChild(link);
-					link.click();
-					link.remove();
-					setTimeout(() => URL.revokeObjectURL(url), 10000);
-					exportStatus.classList.add('success');
-					exportStatus.textContent = 'Your CSV export is ready.';
-				} catch (error) {
-					exportStatus.classList.add('error');
-					exportStatus.textContent = error.message || 'The export could not be generated.';
-				} finally {
-					exportButton.disabled = false;
-					exportButton.textContent = 'Download CSV';
-				}
-			});
-
-			document.getElementById('lock-button').addEventListener('click', () => {
-				adminKey = '';
-				exportPanel.hidden = true;
-				accessForm.hidden = false;
-				connectButton.disabled = false;
-				accessStatus.className = 'status';
-				accessStatus.textContent = 'Admin page locked.';
-				document.getElementById('admin-key').focus();
-			});
-		})();
-	</script>
-</body>
-</html>
+<html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow"><title>Feedback Admin | UoS File Compressor</title>
+<style>
+:root{font-family:"Segoe UI",Arial,sans-serif;color:#17251a;background:#f1f6f0}*{box-sizing:border-box}body{margin:0;background:linear-gradient(135deg,#eef5ed,#fafbf8)}main{width:min(1120px,100% - 32px);margin:48px auto}header{display:flex;justify-content:space-between;align-items:center;gap:16px;margin-bottom:28px}.eyebrow{color:#397346;text-transform:uppercase;letter-spacing:.1em;font-size:11px;font-weight:800}h1{font-size:30px;margin:8px 0}h2{font-size:19px;margin-top:0}p{color:#657368;line-height:1.5}.panel{padding:24px;border:1px solid #d5e1d5;border-radius:14px;background:white;box-shadow:0 12px 30px #1d362009;margin-bottom:18px}#login-panel{max-width:480px;margin:0 auto}label{display:block;font-size:13px;font-weight:600;margin:12px 0 7px}input,select{width:100%;min-height:44px;padding:10px;border:1px solid #cbd7cc;border-radius:7px;font:inherit;background:white;color:inherit}button{min-height:44px;padding:10px 18px;border:0;border-radius:7px;font:inherit;font-weight:600;cursor:pointer;background:#174f23;color:white}button.secondary{background:#eef4ed;color:#174f23}button:disabled{opacity:.6;cursor:wait}input:focus-visible,select:focus-visible,button:focus-visible{outline:2px solid #62a570;outline-offset:2px}.filters{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}.dates{display:grid;grid-template-columns:1fr 1fr;gap:16px}.actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:22px}.status{min-height:24px;font-size:14px}.error{color:#b42318}.notice{font-size:12px}.table-wrap{overflow:auto}table{border-collapse:collapse;width:100%;font-size:13px}th,td{text-align:left;padding:13px 10px;border-bottom:1px solid #e5ece4;vertical-align:top}th{color:#526556;background:#f6f9f4}td:last-child{min-width:240px;white-space:pre-wrap;overflow-wrap:anywhere}.summary{font-weight:600;color:#174f23}a{color:#397346}[hidden]{display:none!important}@media(max-width:680px){main{margin:24px auto}.filters{grid-template-columns:1fr}.panel{padding:18px}header{align-items:start;flex-direction:column}.actions button{flex:1}}
+</style></head><body><main>
+<header><div><div class="eyebrow">University of Sharjah</div><h1>Customer feedback</h1><p>Review ratings and download reports for any date period.</p></div><a href="/">Back to compressor</a></header>
+<section id="login-panel" class="panel"><h2>Administrator sign-in</h2><p>Sign in with your administrator email and password.</p><form id="login-form">
+<label for="email">Email address</label><input id="email" type="email" autocomplete="username" required>
+<label for="password">Password</label><input id="password" type="password" autocomplete="current-password" maxlength="256" required>
+<div class="actions"><button id="sign-in" type="submit">Sign in</button></div></form><p id="login-status" class="status" role="status" aria-live="polite"></p></section>
+<div id="dashboard" hidden>
+<section class="panel"><header><div><h2>Feedback reports</h2><p id="signed-in"></p></div><button id="sign-out" class="secondary">Sign out</button></header>
+<form id="filters-form"><div class="filters">
+<div><label for="period">Date period</label><select id="period"><option value="all">All records</option><option value="week">Weekly</option><option value="month">Monthly</option><option value="year">Yearly</option><option value="custom">Custom date range</option></select></div>
+<div><label for="mode">Service</label><select id="mode"><option value="all">All services</option><option value="compress">Compress</option><option value="convert">Convert</option><option value="merge">Merge</option><option value="split">Split</option></select></div>
+<div><label for="timezone">Date timezone</label><select id="timezone"><option value="Asia/Dubai">Dubai (UTC+4)</option><option value="UTC">UTC</option></select></div></div>
+<div id="anchor-field" hidden><label for="anchor">Choose a date in the week, month, or year</label><input id="anchor" type="date"></div>
+<div id="custom-fields" class="dates" hidden><div><label for="from">From</label><input id="from" type="date"></div><div><label for="to">Through</label><input id="to" type="date"></div></div>
+<p class="notice">Weeks run Monday to Sunday. Custom ranges include both dates. Exported timestamps use UTC.</p>
+<div class="actions"><button id="preview" type="submit">Show feedback</button><button class="secondary" id="csv" type="button">Download CSV</button><button class="secondary" id="xlsx" type="button">Download Excel (.xlsx)</button></div></form>
+<p id="report-status" class="status" role="status" aria-live="polite"></p></section>
+<section class="panel"><h2>Matching feedback</h2><p id="summary" class="summary"></p><p id="range" class="notice"></p><div class="table-wrap"><table><thead><tr><th>ID</th><th>Submitted</th><th>Rating</th><th>Service</th><th>Comment</th></tr></thead><tbody id="rows"></tbody></table></div></section>
+</div></main><script>
+(()=>{
+const $=id=>document.getElementById(id);
+const today=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Dubai',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
+for(const id of ['anchor','from','to'])$(id).value=today;
+let busy=false;
+function loginView(){ $('dashboard').hidden=true;$('login-panel').hidden=false;$('rows').replaceChildren();$('password').value=''; }
+async function request(url,options){const response=await fetch(url,{credentials:'same-origin',...options});if(!response.ok){const data=await response.json().catch(()=>({}));if(response.status===401)loginView();throw new Error(data.error||'Request failed ('+response.status+').');}return response;}
+function status(id,text,error=false){$(id).textContent=text;$(id).className='status'+(error?' error':'');}
+function filters(format){const p=new URLSearchParams({period:$('period').value,mode:$('mode').value,timezone:$('timezone').value,format});if($('period').value==='custom'){p.set('from',$('from').value);p.set('to',$('to').value);}else if($('period').value!=='all')p.set('anchor',$('anchor').value);return p;}
+function toggleDates(){const period=$('period').value;$('anchor-field').hidden=['all','custom'].includes(period);$('custom-fields').hidden=period!=='custom';$('anchor').required=!$('anchor-field').hidden;$('from').required=$('to').required=period==='custom';}
+function setBusy(value){busy=value;for(const id of ['preview','csv','xlsx'])$(id).disabled=value;}
+async function report(format){if(busy||!$('filters-form').reportValidity())return;setBusy(true);status('report-status','Loading feedback...');
+try{const response=await request('/api/admin-feedback?'+filters(format));
+if(format==='json'){const data=await response.json();$('rows').replaceChildren();for(const row of data.rows){const tr=document.createElement('tr');const values=[row.id,new Intl.DateTimeFormat('en-GB',{timeZone:data.timezone,dateStyle:'medium',timeStyle:'short'}).format(new Date(row.created_at)),row.rating+'/5',row.tool_mode,row.comment||'—'];for(const value of values){const td=document.createElement('td');td.textContent=value;tr.appendChild(td);}$('rows').appendChild(tr);}
+const count=data.rows.length,avg=count?(data.rows.reduce((sum,row)=>sum+Number(row.rating),0)/count).toFixed(2):null;$('summary').textContent=count+' response'+(count===1?'':'s')+(avg?' · Average rating '+avg+'/5':'');
+$('range').textContent=data.bounds.start?'From '+new Date(data.bounds.start).toLocaleString('en-GB',{timeZone:data.timezone})+' to '+new Date(new Date(data.bounds.end).getTime()-1).toLocaleString('en-GB',{timeZone:data.timezone})+' ('+data.timezone+')':'All dates';status('report-status',count?'Feedback loaded.':'No feedback matches these filters.');
+}else{const blob=await response.blob(),url=URL.createObjectURL(blob),link=document.createElement('a');link.href=url;link.download=response.headers.get('Content-Disposition')?.match(/filename="([^"]+)"/)?.[1]||'customer-feedback.'+format;document.body.appendChild(link);link.click();link.remove();setTimeout(()=>URL.revokeObjectURL(url),10000);status('report-status','Your '+(format==='xlsx'?'Excel':'CSV')+' export is ready.');}}
+catch(error){status('report-status',error.message,true);if($('dashboard').hidden)status('login-status',error.message,true);}finally{setBusy(false);}}
+async function signedIn(email){$('login-panel').hidden=true;$('dashboard').hidden=false;$('signed-in').textContent='Signed in as '+email;$('password').value='';await report('json');}
+$('login-form').addEventListener('submit',async event=>{event.preventDefault();$('sign-in').disabled=true;status('login-status','Signing in...');try{const response=await request('/api/admin-session',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email:$('email').value,password:$('password').value})});await signedIn((await response.json()).email);}catch(error){status('login-status',error.message,true);}finally{$('password').value='';$('sign-in').disabled=false;}});
+$('sign-out').addEventListener('click',async()=>{try{await request('/api/admin-session',{method:'DELETE'});loginView();status('login-status','Signed out.');}catch(error){status('report-status',error.message,true);}});
+$('period').addEventListener('change',toggleDates);$('filters-form').addEventListener('submit',event=>{event.preventDefault();report('json');});$('csv').addEventListener('click',()=>report('csv'));$('xlsx').addEventListener('click',()=>report('xlsx'));toggleDates();
+(async()=>{try{const response=await fetch('/api/admin-session',{credentials:'same-origin'});if(response.ok)await signedIn((await response.json()).email);else if(response.status!==401){const data=await response.json();status('login-status',data.error,true);}}catch{status('login-status','Unable to connect. Please try again.',true);}})();
+})();
+</script></body></html>

@@ -46,14 +46,17 @@ GROUP BY tool_mode, rating
 ORDER BY tool_mode, rating;
 ```
 
-## Admin CSV Export
+## Administrator sign-in and reports
 
-The admin page is available at `/admin.html`. It supports all records, the current UTC week/month/year, or an inclusive custom date range, with an optional service filter. Exported CSV includes the feedback ID, timestamp, rating, service, and comment. Formula-like comment values are neutralized for spreadsheet safety.
+The administrator page is `/admin.html`. Only the email configured in `ADMIN_EMAIL` can sign in. Reports include CSV and Excel (.xlsx), historical weekly/monthly/yearly periods, inclusive custom dates, and service filters. Calendar periods default to Dubai time (UTC+4); UTC is also available. Weeks begin Monday. Export timestamps use UTC.
 
-1. Generate a high-entropy access key locally, for example with `node -e "console.log(require('crypto').randomBytes(32).toString('base64url'))"`.
-2. In Vercel Project Settings > Environment Variables, add `ADMIN_ACCESS_KEY` for Production. Use the generated value directly in Vercel; do not paste it into this repository, the browser, or a chat.
-3. Redeploy, then visit `https://uos-file-compressor.vercel.app/admin.html` and enter the key. It is kept only in memory for that page session; use **Lock admin page** or close the page to clear it.
+1. Run `admin-schema.sql` in the existing Neon database.
+2. Set `ADMIN_EMAIL` in Vercel for Production.
+3. Enter a unique password of 16–256 characters directly into a sensitive Production variable named `ADMIN_PASSWORD`. Never commit it, print it, or paste it into chat.
+4. Redeploy and sign in at `/admin.html`.
 
-Treat the admin key like a password and rotate it in Vercel if it is disclosed. The key grants read/export access to feedback, including optional comments. Consider restricting the deployment with Vercel access controls if the admin page should be private to an organization.
+The password stays on the server. Hashed random sessions use a Secure, HttpOnly, SameSite=Strict cookie and expire after four hours. Sign out revokes the session. Changing credentials and redeploying invalidates existing sessions. To reset a forgotten password, replace `ADMIN_PASSWORD` in Vercel and redeploy. There is no public registration. Sign-in attempts are limited per hashed IP and globally in separate admin tables. Feedback rows do not contain IP addresses.
+
+`ADMIN_ACCESS_KEY` is no longer used. Configure Preview credentials only if Preview should access feedback. CSV formula-like values are neutralized; Excel comments are stored as text.
 
 Automatic prompting is limited to once per browser per service every 24 hours after dismissal; successful submissions are also limited per service per browser every 24 hours. Clearing browser storage can reset these client-side limits. The API validates fields, enforces same-origin requests, limits payload size, and includes a honeypot field; it does not store IP addresses.
