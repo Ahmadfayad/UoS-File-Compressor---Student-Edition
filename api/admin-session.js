@@ -4,7 +4,7 @@ module.exports=async function(req,res){
  res.setHeader('Cache-Control','no-store');res.setHeader('X-Content-Type-Options','nosniff');
  if(!['GET','POST','DELETE'].includes(req.method)){res.setHeader('Allow','GET, POST, DELETE');return res.status(405).json({error:'Method not allowed.'});}
  if(req.method!=='GET'&&!auth.sameOrigin(req))return res.status(403).json({error:'Cross-origin requests are not accepted.'});
- const cfg=auth.config();if(!cfg)return res.status(503).json({error:'Admin sign-in is not configured. Set ADMIN_EMAIL and ADMIN_PASSWORD in Vercel.'});
+ const cfg=auth.config();if(!cfg)return res.status(503).json({error:auth.setupError()||'Admin sign-in is not configured.'});
  try{
  if(req.method==='GET'){const user=await auth.principal(req);return user?res.status(200).json({email:user.email,owner:user.owner}):res.status(401).json({error:'Please sign in.'});}
  if(req.method==='DELETE'){await auth.signOut(req);res.setHeader('Set-Cookie',auth.cookie('',0));return res.status(204).end();}
