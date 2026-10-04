@@ -83,7 +83,8 @@ module.exports = async function handler(req, res) {
 	}
 
 	if (!auth.config()) return res.status(503).json({ error: 'Admin sign-in is not configured.' });
-	try { if (!await auth.authorized(req)) return res.status(401).json({ error: 'Please sign in.' }); }
+	let actor;
+	try { actor=await auth.principal(req); if (!actor) return res.status(401).json({ error: 'Please sign in.' }); }
 	catch { return res.status(503).json({ error: 'Admin sign-in is temporarily unavailable.' }); }
 
 	const query = req.query || {};
@@ -110,7 +111,7 @@ module.exports = async function handler(req, res) {
 				AND (${mode} = 'all' OR tool_mode = ${mode})
 			ORDER BY created_at DESC, id DESC
 		`;
-		if (format === 'json') return res.status(200).json({ rows, timezone: query.timezone || 'Asia/Dubai', bounds });
+		if (format === 'json') return res.status(200).json({ rows, canDelete: actor.owner || actor.email === 'aalbalbissi@sharjah.ac.ae', timezone: query.timezone || 'Asia/Dubai', bounds });
 		if (format === 'xlsx') {
 			const workbook = new ExcelJS.Workbook();
 			const sheet = workbook.addWorksheet('Customer feedback');

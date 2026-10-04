@@ -10,6 +10,7 @@ if(sql.includes('INSERT INTO public.feedback_admin_login_limits'))return [{attem
 if(sql.includes('INSERT INTO public.feedback_admin_sessions')){sessions.set(values[0],{fingerprint:values[1],email:values[2],expires:Date.now()+14400000});return [];}
 if(sql.includes('SELECT credential_fingerprint')){const s=sessions.get(values[0]);return s&&s.expires>Date.now()?[{credential_fingerprint:s.fingerprint,user_email:s.email}]:[];}
 if(sql.includes('DELETE FROM public.feedback_admin_sessions WHERE token_hash')){sessions.delete(values[0]);return [];}
+if(sql.includes('DELETE FROM public.customer_feedback'))return values[0]==='1'?[{id:1}]:[];
 if(sql.includes('DELETE'))return [];
 if(sql.includes('FROM public.customer_feedback'))return feedback;
 if(sql.includes('SELECT email,password_hash'))return users.has(values[0])?[users.get(values[0])]:[];
@@ -97,4 +98,24 @@ assert.equal((await invoke(session,req('POST',body))).statusCode,200);
 assert.equal((await invoke(manager,req('DELETE',{email:'admin@example.test'},ownerCookie))).statusCode,400);
 assert.equal((await invoke(manager,req('POST',{email:'bad',password:body.password},ownerCookie))).statusCode,400);
 const cross=req('POST',{email:'valid@example.test',password:body.password},ownerCookie);cross.headers.origin='https://attacker.test';assert.equal((await invoke(manager,cross)).statusCode,403);
+});
+
+const deletion=require('./admin-feedback-delete');
+test('feedback deletion requires confirmation and owner or the specific secondary account',async()=>{
+attempts=0;
+assert.equal(deletion.canDelete({email:'other@example.test',owner:false}),false);
+const login=await invoke(session,req('POST',{email:'admin@example.test',password:process.env.ADMIN_PASSWORD})),cookie=login.headers['Set-Cookie'].split(';')[0];
+assert.equal((await invoke(deletion,req('DELETE',{id:1,confirmed:true}))).statusCode,401);
+assert.equal((await invoke(deletion,req('DELETE',{id:1},cookie))).statusCode,400);
+assert.equal((await invoke(deletion,req('DELETE',{id:'1 OR 1=1',confirmed:true},cookie))).statusCode,400);
+assert.equal((await invoke(deletion,req('DELETE',{id:1,confirmed:true},cookie))).statusCode,200);
+assert.equal((await invoke(deletion,req('DELETE',{id:999,confirmed:true},cookie))).statusCode,404);
+const cross=req('DELETE',{id:1,confirmed:true},cookie);cross.headers.origin='https://attacker.test';assert.equal((await invoke(deletion,cross)).statusCode,403);
+const second={email:'aalbalbissi@sharjah.ac.ae',password:'test-secondary-password'};
+assert.equal((await invoke(manager,req('POST',second,cookie))).statusCode,201);
+const secondLogin=await invoke(session,req('POST',second)),secondCookie=secondLogin.headers['Set-Cookie'].split(';')[0];
+assert.equal((await invoke(deletion,req('DELETE',{id:1,confirmed:true},secondCookie))).statusCode,200);
+assert.equal((await invoke(manager,req('GET',{},secondCookie))).statusCode,403);
+const reportLogin=await invoke(session,req('POST',{email:'reporter@example.test',password:'test-only-user-password'}));
+assert.equal((await invoke(deletion,req('DELETE',{id:1,confirmed:true},reportLogin.headers['Set-Cookie'].split(';')[0]))).statusCode,403);
 });

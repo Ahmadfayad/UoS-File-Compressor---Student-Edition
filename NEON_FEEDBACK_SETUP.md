@@ -64,3 +64,7 @@ Automatic prompting is limited to once per browser per service every 24 hours af
 ## Authorized users
 
 The owner configured in Vercel can add authorized users at /admin.html with an email and a unique password of at least 6 characters. Added users can read and export feedback but cannot manage accounts. Passwords are stored as salted scrypt hashes in Neon, never returned by the API. Owner controls allow password reset, restore, and revoke. Reset or revoke immediately invalidates that user's existing sessions. New users are not automatically emailed; share credentials privately. Apply the complete admin-schema.sql for the users table and session email column. The owner credentials remain in Vercel.
+
+## Delete test feedback
+
+The owner and the authorized account aalbalbissi@sharjah.ac.ae may permanently delete individual feedback rows using the row action in Matching feedback. The action asks for confirmation and checks permission on the server. Other accounts cannot delete feedback. The second account must exist as an active authorized user with its own password; deletion permission does not grant account management. Deleted rows no longer appear in reports or exports.
