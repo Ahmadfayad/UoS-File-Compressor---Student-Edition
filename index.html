@@ -1084,6 +1084,23 @@
 			align-items: flex-start;
 		}
 
+		.engine-tag {
+			display: inline-flex;
+			align-items: center;
+			padding: 2px 8px;
+			border-radius: 999px;
+			font-size: 10px;
+			font-weight: 700;
+			background: rgba(47, 122, 63, 0.12);
+			color: var(--green-light);
+			border: 1px solid rgba(47, 122, 63, 0.25);
+		}
+
+		.engine-warning {
+			color: var(--gold);
+			font-weight: 600;
+		}
+
 		.result-item.error {
 			border-color: rgba(211, 47, 47, 0.18);
 			background: rgba(211, 47, 47, 0.05);
@@ -3473,15 +3490,92 @@
 			}
 		}
 
+		/**
+		 * UNIFIED MASTER COMPRESSOR — the single top-level routing entry point for
+		 * any file that must end up within TARGET_MAX. Every mode (Compress, Merge,
+		 * Split extraction, Convert PDF->PDF) funnels through this so the exact same
+		 * vector-preserving chain is applied everywhere:
+		 *   - PDF            → compressPdfSmart (early-exit / analyze / vector / raster fallbacks)
+		 *   - Image → PDF    → imageToLowDpiPdf when the user prefers PDF output
+		 *   - Text-like      → compressTextFile (GZIP; never rasterized)
+		 *   - Images         → compressImage
+		 * Always returns the standard result object consumed by renderBatchResults:
+		 *   { blob, fileName, mime, originalSize, compressedSize, savingsPercent, codecLabel, renderedPdf }
+		 * Errors are caught and re-thrown as a standardized Error message so callers
+		 * push a clean { file, error } entry instead of crashing the UI.
+		 */
+		async function compressAnyFile(file, onProgress = () => {}, levelKey = AUTO_LEVEL) {
+			const noopSafeProgress = typeof onProgress === "function" ? onProgress : () => {};
+
+			if (!isSupportedFile(file)) {
+				throw new Error(`Unsupported file type: ${file.type || getFileExtension(file.name) || "unknown"}. Please upload a PDF, image, or text file.`);
+			}
+			if (file.size > MAX_INPUT_BYTES) {
+				throw new Error(`File too large: ${formatBytes(file.size)}. Maximum supported size is 100 MB.`);
+			}
+
+			let result = null;
+			let processingError = null;
+
+			try {
+				if (isPdfFile(file)) {
+					// Smart chain: early exit -> analyze -> vector-preserving path for
+					// text-heavy docs -> legacy image/DPI path otherwise -> guaranteed last resort.
+					result = await compressPdfSmart(file, levelKey, noopSafeProgress);
+				} else {
+					const profile = await detectInternalFileProfile(file);
+					const isTextRoute = isTextFile(file) || profile.isTextLike || profile.isLikelyMarkup;
+
+					if (isTextRoute) {
+						result = await compressTextFile(file, noopSafeProgress);
+					} else if (isImageFile(file)) {
+						if (file.userPreference === "pdf") {
+							noopSafeProgress("Converting image to PDF…", 10);
+							result = await imageToLowDpiPdf(file, noopSafeProgress);
+							if (!result || result.mime !== "application/pdf") {
+								noopSafeProgress("Ensuring PDF format…", 80);
+								result = await imageToLowDpiPdf(file, noopSafeProgress);
+							}
+						} else {
+							result = await compressImage(file, levelKey, noopSafeProgress);
+						}
+					} else {
+						result = await compressImage(file, levelKey, noopSafeProgress);
+					}
+				}
+			} catch (error) {
+				result = null;
+				processingError = error;
+			}
+
+			// Last-resort guarantee: PDF-bound routes must always produce a cap-safe PDF.
+			if (!result && (isPdfFile(file) || (isImageFile(file) && file.userPreference === "pdf"))) {
+				try {
+					result = await buildGuaranteedFallbackPdf(file, noopSafeProgress);
+				} catch (fallbackError) {
+					processingError = fallbackError || processingError;
+				}
+			}
+
+			if (!result) {
+				throw new Error(
+					processingError instanceof Error
+						? processingError.message
+						: "Unable to process this file without changing its format or content."
+				);
+			}
+
+			return result;
+		}
+
 		/** Single entry point for Convert mode: routes to the right conversion path and always enforces TARGET_MAX. */
 		async function convertFile(file, targetFormat, onProgress) {
 			if (isPdfFile(file)) {
 				if (targetFormat === "application/pdf") {
-					let result = await compressPdf(file, AUTO_LEVEL, onProgress);
-					if (result.compressedSize > TARGET_MAX) {
-						result = await buildGuaranteedFallbackPdf(file, onProgress);
-					}
-					return result;
+					// Route PDF -> PDF conversion through the same vector-preserving
+					// smart chain used by Merge/Split/Compress so text layers survive
+					// whenever possible while still enforcing TARGET_MAX.
+					return await compressPdfSmart(file, AUTO_LEVEL, onProgress);
 				}
 				return convertPdfPagesToImages(file, targetFormat, onProgress);
 			}
@@ -4124,51 +4218,82 @@
 			return makeResult(bestBlob, `${baseName}_lowdpi.pdf`, "application/pdf", originalSize, "Raster PDF (cap tuned)", true);
 		}
 
+		// Configure the pdf.js worker exactly once per page load.
+		let pdfjsWorkerConfigured = false;
+		function ensurePdfjsWorker() {
+			if (pdfjsWorkerConfigured) return;
+			window.pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.js";
+			pdfjsWorkerConfigured = true;
+		}
+
 		/**
 		 * Samples the first 3 pages of a PDF to decide whether it is text-heavy
 		 * (vector transcripts, official documents) or image-heavy (scans/photos).
+		 * Never throws: encrypted/damaged files return { encrypted: true } so the
+		 * dispatcher can fall through to the legacy compressPdf path.
 		 */
 		async function analyzePdfContent(file) {
 			const pdfjs = window.pdfjsLib;
-			pdfjs.GlobalWorkerOptions.workerSrc = "https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.js";
-			const buffer = await file.arrayBuffer();
-			const loadedPdf = await pdfjs.getDocument({ data: buffer.slice(0) }).promise;
-			const pageCount = loadedPdf.numPages;
-			const pagesToCheck = Math.min(3, pageCount);
-			const OPS = pdfjs.OPS || {};
-			const paintImageOps = new Set([
-				OPS.paintImageXObject,
-				OPS.paintInlineImageXObject,
-				OPS.paintJpegXObject,
-			].filter((op) => Number.isInteger(op)));
+			ensurePdfjsWorker();
+			let loadedPdf = null;
+			try {
+				const buffer = await file.arrayBuffer();
+				loadedPdf = await pdfjs.getDocument({ data: buffer.slice(0) }).promise;
+				const pageCount = loadedPdf.numPages;
+				const pagesToCheck = Math.min(3, pageCount);
+				const OPS = pdfjs.OPS || {};
+				const paintImageOps = new Set([
+					OPS.paintImageXObject,
+					OPS.paintInlineImageXObject,
+					OPS.paintJpegXObject,
+				].filter((op) => Number.isInteger(op)));
 
-			let textItems = 0;
-			let imageObjects = 0;
+				let textItems = 0;
+				let imageObjects = 0;
 
-			for (let pageNumber = 1; pageNumber <= pagesToCheck; pageNumber += 1) {
-				const page = await loadedPdf.getPage(pageNumber);
-				const content = await page.getTextContent();
-				textItems += content.items?.length || 0;
-				try {
-					const operatorList = await page.getOperatorList();
-					for (const fn of operatorList.fnArray) {
-						if (paintImageOps.has(fn)) imageObjects += 1;
+				for (let pageNumber = 1; pageNumber <= pagesToCheck; pageNumber += 1) {
+					const page = await loadedPdf.getPage(pageNumber);
+					const content = await page.getTextContent();
+					textItems += content.items?.length || 0;
+					try {
+						const operatorList = await page.getOperatorList();
+						for (const fn of operatorList.fnArray) {
+							if (paintImageOps.has(fn)) imageObjects += 1;
+						}
+					} catch (error) {
+						// Operator list unavailable (e.g. encrypted stream): treat as no images found on this page.
 					}
-				} catch (error) {
-					// Operator list unavailable (e.g. encrypted stream): treat as no images found on this page.
+					page.cleanup();
 				}
-				page.cleanup();
+
+				const avgText = textItems / Math.max(pagesToCheck, 1);
+				const avgImages = imageObjects / Math.max(pagesToCheck, 1);
+				const isTextHeavy = avgText > 50 && avgImages < 5;
+
+				return {
+					isTextHeavy,
+					isImageHeavy: !isTextHeavy && avgImages >= 5,
+					pageCount,
+					encrypted: false,
+				};
+			} catch (error) {
+				const isPasswordError = error?.name === "PasswordException"
+					|| error?.code === 15 /* PASSWORD_ENCRYPTION_ERROR */
+					|| /password/i.test(error?.message || "");
+				// Encrypted or unreadable PDF: never crash the pipeline. Route to the legacy path.
+				return {
+					isTextHeavy: false,
+					isImageHeavy: false,
+					pageCount: 0,
+					encrypted: isPasswordError,
+				};
+			} finally {
+				try {
+					await loadedPdf?.destroy();
+				} catch (error) {
+					// Ignore teardown failures — analysis result already decided.
+				}
 			}
-
-			const avgText = textItems / Math.max(pagesToCheck, 1);
-			const avgImages = imageObjects / Math.max(pagesToCheck, 1);
-			const isTextHeavy = avgText > 50 && avgImages < 5;
-
-			return {
-				isTextHeavy,
-				isImageHeavy: !isTextHeavy && avgImages >= 5,
-				pageCount,
-			};
 		}
 
 		/**
@@ -4181,10 +4306,17 @@
 
 			onProgress("Optimizing vectors (text preserved)…", 20);
 			const buffer = await file.arrayBuffer();
-			const pdfDoc = await window.PDFLib.PDFDocument.load(buffer, {
-				ignoreEncryption: true,
-				updateMetadata: false,
-			});
+			let pdfDoc;
+			try {
+				pdfDoc = await window.PDFLib.PDFDocument.load(buffer, {
+					ignoreEncryption: true,
+					updateMetadata: false,
+				});
+			} catch (error) {
+				// pdf-lib could not load the document at all — surface a clear error so
+				// the dispatcher can fall through to the high-quality raster fallback.
+				throw new Error(`Vector optimization unavailable for this PDF (${error?.message || "load failed"}).`);
+			}
 
 			pdfDoc.setTitle("");
 			pdfDoc.setAuthor("");
@@ -4263,6 +4395,70 @@
 			return makeResult(bestBlob, `${baseName}_compressed.pdf`, "application/pdf", originalSize, "Rasterized (High Quality fallback)", true);
 		}
 
+		/**
+		 * Shared smart fallback chain for ALL PDF routes (main compress, split extraction,
+		 * merge). Preserves vectors/text whenever possible while still enforcing the hard
+		 * TARGET_MAX cap:
+		 *   1. Early exit — return ORIGINAL bytes untouched if already under the cap
+		 *      (preserves encryption, signatures and text layers).
+		 *   2. Analyze content; encrypted/unreadable files fall through to the legacy path.
+		 *   3. Text-heavy → lossless vector optimization; rasterize (high quality) only if
+		 *      it still exceeds TARGET_MAX or pdf-lib cannot load the document.
+		 *   4. Image-heavy/mixed → existing compressPdf + lower-DPI fallback behaviour.
+		 *   5. Last resort → buildGuaranteedFallbackPdf so a cap-safe result is always produced.
+		 */
+		async function compressPdfSmart(file, levelKey, onProgress) {
+			const originalSize = file.size;
+
+			// 1. EARLY EXIT: If already under cap, don't touch the file at all.
+			if (originalSize <= TARGET_MAX) {
+				onProgress("File already within target size", 100);
+				return makeResult(
+					new Blob([await file.arrayBuffer()], { type: "application/pdf" }),
+					file.name,
+					"application/pdf",
+					originalSize,
+					"Already optimized",
+					false
+				);
+			}
+
+			// 2. Analyze content structure (text vs. raster). Never throws.
+			onProgress("Analyzing document structure...", 5);
+			const analysis = await analyzePdfContent(file);
+
+			// 3. TEXT-HEAVY PATH (e.g., transcripts): preserve vectors at all costs.
+			if (analysis.isTextHeavy && !analysis.encrypted) {
+				let textResult = null;
+				try {
+					textResult = await optimizeTextHeavyPdf(file, onProgress);
+				} catch (error) {
+					textResult = null; // Fall through to the high-quality rasterizer below.
+				}
+				if (textResult && textResult.compressedSize <= TARGET_MAX) {
+					return textResult;
+				}
+				// Only rasterize if lossless optimization wasn't enough (or failed).
+				return await smartRasterizeTextPdf(file, onProgress);
+			}
+
+			// 4. IMAGE-HEAVY / MIXED / ENCRYPTED PATH (existing behavior, still cap-enforced).
+			let result = null;
+			try {
+				result = await compressPdf(file, levelKey, onProgress);
+				if (result.compressedSize > TARGET_MAX || !hasMeaningfulSavings(originalSize, result.compressedSize)) {
+					result = await pdfToLowerDpiFallback(file, onProgress);
+				}
+			} catch (error) {
+				result = null;
+			}
+			if (!result) {
+				// 5. Last resort: guaranteed cap-safe raster PDF.
+				result = await buildGuaranteedFallbackPdf(file, onProgress);
+			}
+			return result;
+		}
+
 		async function compressTextFile(file, onProgress) {
 			const originalSize = file.size;
 
@@ -4294,83 +4490,12 @@
 		}
 
 		async function compressFile(file, levelKey, onProgress) {
-			if (!isSupportedFile(file)) {
-				throw new Error(`Unsupported file type: ${file.type || getFileExtension(file.name) || "unknown"}. Please upload a PDF, image, or text file.`);
-			}
-
-			if (file.size > MAX_INPUT_BYTES) {
-				throw new Error(`File too large: ${formatBytes(file.size)}. Maximum supported size is 100 MB.`);
-			}
-
-			const profile = await detectInternalFileProfile(file);
-			let result = null;
-			let processingError = null;
-			const isTextRoute = isTextFile(file) || profile.isTextLike || profile.isLikelyMarkup;
-
-			try {
-				if (isPdfFile(file)) {
-					// EARLY EXIT: If already under cap, don't touch it.
-					if (file.size <= TARGET_MAX) {
-						onProgress("File already within target size", 100);
-						result = makeResult(
-							new Blob([await file.arrayBuffer()], { type: "application/pdf" }),
-							file.name,
-							"application/pdf",
-							file.size,
-							"Already optimized",
-							false
-						);
-					} else {
-						// 1. Analyze content structure (text vs. raster).
-						onProgress("Analyzing document structure...", 5);
-						const analysis = await analyzePdfContent(file);
-
-						// 2. TEXT-HEAVY PATH (e.g., transcripts): preserve vectors at all costs.
-						if (analysis.isTextHeavy) {
-							result = await optimizeTextHeavyPdf(file, onProgress);
-							if (result.compressedSize > TARGET_MAX) {
-								// Only rasterize if lossless optimization wasn't enough.
-								result = await smartRasterizeTextPdf(file, onProgress);
-							}
-						}
-						// 3. IMAGE-HEAVY / MIXED PATH (existing behavior, still cap-enforced).
-						else {
-							result = await compressPdf(file, levelKey, onProgress);
-							if (result.compressedSize > TARGET_MAX || !hasMeaningfulSavings(file.size, result.compressedSize)) {
-								result = await pdfToLowerDpiFallback(file, onProgress);
-							}
-						}
-					}
-				} else if (isTextRoute) {
-					result = await compressTextFile(file, onProgress);
-				} else if (isImageFile(file)) {
-					// Check if user explicitly wants to convert image to PDF
-					if (file.userPreference === "pdf") {
-						onProgress("Converting image to PDF…", 10);
-						result = await imageToLowDpiPdf(file, onProgress);
-						// Force PDF conversion - don't fall back to image compression
-						if (!result || result.mime !== "application/pdf") {
-							onProgress("Ensuring PDF format…", 80);
-							result = await imageToLowDpiPdf(file, onProgress);
-						}
-					} else {
-						// Default: compress as image
-						result = await compressImage(file, levelKey, onProgress);
-					}
-				} else {
-					result = await compressImage(file, levelKey, onProgress);
-				}
-			} catch (error) {
-				result = null;
-				processingError = error;
-			}
-
-			if (!result && (isPdfFile(file) || (isImageFile(file) && file.userPreference === "pdf"))) {
-				result = await buildGuaranteedFallbackPdf(file, onProgress);
-			}
-			if (!result) throw processingError || new Error("Unable to process this file without changing its format or content.");
-
-			return result;
+			// Delegate to the unified master compressor so every route (Compress mode,
+			// and anything else calling compressFile) uses the exact same vector-preserving
+			// smart chain for PDFs. Signature and return shape are unchanged: a makeResult()
+			// object ({ blob, fileName, mime, originalSize, compressedSize, savingsPercent,
+			// codecLabel, renderedPdf }) or a thrown Error with a clean UI message.
+			return await compressAnyFile(file, onProgress, levelKey);
 		}
 
 		function renderSelectedFiles() {
@@ -4438,6 +4563,12 @@
 				downloadAllRow.querySelector("#download-all-zip-btn").addEventListener("click", downloadAllAsZip);
 			}
 
+			// Header engine-dot: show the "fallback" state when any result was rasterized.
+			const anyRasterized = state.results.some(
+				(entry) => !entry.error && /rasterized/i.test(entry.result?.codecLabel || "")
+			);
+			if (anyRasterized) setEngineStatus("fallback", "Canvas Fallback");
+
 			state.results.forEach((entry, index) => {
 				const row = document.createElement("div");
 				row.className = `result-item${entry.error ? " error" : ""}`;
@@ -4452,12 +4583,16 @@
 					const noGain = entry.result.savingsPercent <= 0;
 					const outputName = entry.result.fileName || entry.file.name;
 					const formatChanged = outputName !== entry.file.name;
+					const engineLabel = entry.result.codecLabel || "";
+					const wasRasterized = /rasterized/i.test(engineLabel);
 					row.innerHTML = `
 						<div class="result-item-main">
 							<div class="result-item-name">${escapeHTML(outputName)}</div>
 							<div class="result-item-meta">
 								<span>${formatBytes(entry.result.originalSize)} -> ${formatBytes(entry.result.compressedSize)}</span>
-								<span>${entry.result.savingsPercent}% saved</span>
+								<span>${Math.max(0, entry.result.savingsPercent)}% saved</span>
+								${engineLabel ? `<span class="engine-tag">${escapeHTML(engineLabel)}</span>` : ""}
+								${wasRasterized ? `<span class="engine-warning">⚠️ Rasterized to meet 1MB limit</span>` : ""}
 								${formatChanged ? `<span>Converted from ${escapeHTML(entry.file.name)}</span>` : ""}
 								${entry.result.renderedPdf && isPdfFile(entry.file) ? "<span>Rasterized PDF: text search and interactive content are not preserved.</span>" : ""}
 								${noGain ? "<span>Already optimized in original format.</span>" : ""}
@@ -4808,20 +4943,11 @@
 						reportProgress(stage, pct);
 					});
 					if (state.operationId !== operationId || state.mode !== operationMode) return;
-					const result = await compressPdf(mergedFile, AUTO_LEVEL, (stage, pct) => {
+					// Smart chain: merged transcripts keep their vector text layer when possible.
+					const finalResult = await compressPdfSmart(mergedFile, AUTO_LEVEL, (stage, pct) => {
 						reportProgress(stage, 45 + pct * 0.55);
-					}, {
-						preferTextPreservation: false,
-						preserveColor: true,
 					});
 					if (state.operationId !== operationId || state.mode !== operationMode) return;
-
-					let finalResult = result;
-					if (finalResult.compressedSize > TARGET_MAX) {
-						finalResult = await buildGuaranteedFallbackPdf(mergedFile, (stage, pct) => {
-							reportProgress(stage, 70 + pct * 0.3);
-						});
-					}
 
 					results.push({ file: mergedFile, result: finalResult });
 				} catch (error) {
@@ -5620,14 +5746,10 @@
 				const pageFile = new File([pdfBytes], pageFileName, { type: "application/pdf" });
 
 				showProgress("Compressing page " + pageNum + "\u2026 (" + (i + 1) + " of " + pages.length + ")", pageBaseProgress + 3);
-				let pageResult = await compressPdf(pageFile, AUTO_LEVEL, (stage, pct) => {
+				// Smart chain: preserves vectors for text-heavy extracted pages.
+				const pageResult = await compressPdfSmart(pageFile, AUTO_LEVEL, (stage, pct) => {
 					showProgress(stage, pageBaseProgress + 3 + pct * 0.02);
 				});
-				if (pageResult.compressedSize > TARGET_MAX) {
-					pageResult = await buildGuaranteedFallbackPdf(pageFile, (stage, pct) => {
-						showProgress(stage, pageBaseProgress + 3 + pct * 0.02);
-					});
-				}
 
 				zip.file(pageFileName, pageResult.blob);
 			}
@@ -5686,14 +5808,10 @@
 			const mergedFile = new File([pdfBytes], mergedFileName, { type: "application/pdf" });
 
 			showProgress("Compressing extracted PDF\u2026", 70);
-			let finalResult = await compressPdf(mergedFile, AUTO_LEVEL, (stage, pct) => {
+			// Smart chain: preserves vectors for text-heavy extracted documents.
+			const finalResult = await compressPdfSmart(mergedFile, AUTO_LEVEL, (stage, pct) => {
 				showProgress(stage, 70 + pct * 0.2);
 			});
-			if (finalResult.compressedSize > TARGET_MAX) {
-				finalResult = await buildGuaranteedFallbackPdf(mergedFile, (stage, pct) => {
-					showProgress(stage, 90 + pct * 0.06);
-				});
-			}
 			if (state.operationId !== operationId || state.mode !== "split") throw new Error("Extraction cancelled because the tool mode changed.");
 
 			showProgress("Download starting\u2026", 98);
