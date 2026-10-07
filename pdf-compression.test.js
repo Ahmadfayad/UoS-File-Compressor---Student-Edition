@@ -82,3 +82,74 @@ test('identical images are shared without merging different image dictionaries',
   assert.equal(refs[2],different);
   assert.equal(objects.has(duplicate),false);
 });
+
+test('image-to-PDF compression and conversion use the same route', async () => {
+  const cap = 972800;
+  let calls = 0;
+  const context = vm.createContext({
+    Error, TARGET_MAX: cap, MAX_INPUT_BYTES: 100000000, AUTO_LEVEL: 'low',
+    isSupportedFile: () => true, isPdfFile: () => false, isImageFile: () => true,
+    isTextFile: () => false, detectInternalFileProfile: async () => ({}),
+    convertImageToPdf: async () => {calls++; return {blob: {size: cap}, mime: 'application/pdf'};},
+  });
+  vm.runInContext(source('compressAnyFile') + source('convertFile'), context);
+  const file = {size: 2000000, name: 'scan.jpg', userPreference: 'pdf'};
+  await context.compressAnyFile(file);
+  await context.convertFile(file, 'application/pdf', () => {});
+  assert.equal(calls, 2);
+  context.convertImageToPdf = async () => {throw new Error('Invalid image');};
+  await assert.rejects(context.compressAnyFile(file), /Invalid image/);
+});
+
+test('embedded images step down further before rasterization and verify text', async () => {
+  const cap = 972800;
+  class PDFRawStream {constructor(size) {this.contents = new Uint8Array(size); this.dict = {lookup: () => '/Image'};}}
+  const objects = new Map([['image', new PDFRawStream(2000)]]);
+  let quality = 1, closed = 0, outputText = 'same', qualities = [];
+  const doc = {
+    setTitle() {}, setAuthor() {}, setSubject() {}, setKeywords() {}, setProducer() {}, setCreator() {},
+    context: {enumerateIndirectObjects: () => [...objects], lookup: ref => objects.get(ref), assign: (ref, value) => objects.set(ref, value), delete: ref => objects.delete(ref)},
+    embedJpg: async bytes => {objects.set('new', new PDFRawStream(bytes.byteLength)); return {ref: 'new', embed: async () => {}};},
+    save: async () => new Uint8Array(quality > 0.5 ? cap + 1 : cap),
+  };
+  const context = vm.createContext({
+    Blob, TARGET_MAX: cap,
+    window: {PDFLib: {PDFDocument: {load: async () => doc}, PDFRawStream, PDFName: {of: key => key}}},
+    removeUnusedPdfObjects: () => {}, deduplicatePdfImages: async () => {},
+    pdfImageToBitmap: async () => ({width: 3000, height: 2000, close: () => closed++}),
+    encodeJpeg: async (bitmap, width, height, q) => {quality = q; qualities.push(q); return new Blob([new Uint8Array(Math.round(q * 1000))]);},
+    pdfContentSnapshot: async buffer => buffer.byteLength === 1 ? 'same' : outputText,
+  });
+  vm.runInContext(source('makeResult') + source('optimizePdfImages'), context);
+  const file = {size: 2000000, name: 'scan.pdf', arrayBuffer: async () => new ArrayBuffer(1)};
+  const result = await context.optimizePdfImages(file, () => {});
+  assert.equal(result.renderedPdf, false);
+  assert.equal(result.blob.size, cap);
+  assert.equal(qualities.at(-1), 0.5);
+  assert.equal(qualities.length, 7);
+  assert.equal(closed, 1);
+  objects.set('image', new PDFRawStream(2000)); outputText = 'changed';
+  await assert.rejects(context.optimizePdfImages(file, () => {}), /content verification failed/);
+  assert.equal(closed, 2);
+});
+
+test('last PDF fallback can actually reduce resolution and JPEG quality', async () => {
+  let scale, quality, destroyed = false, pageSize;
+  const scales = [];
+  const page = {getViewport: options => {scales.push(options.scale); scale = Math.max(scale || 0, options.scale); return {width: 612 * options.scale, height: 792 * options.scale};}, render: () => ({promise: Promise.resolve()})};
+  const doc = {embedJpg: async () => ({}), addPage: dimensions => {pageSize = dimensions; return {drawImage() {}};}, save: async () => new Uint8Array(10)};
+  const context = vm.createContext({
+    Blob, TARGET_MAX: 972800, MIN_JPEG_QUALITY: 0.62, LEVELS: {high: {pdfDpi: 96, pdfQuality: 0.68}}, state: {codecs: {}},
+    window: {pdfjsLib: {GlobalWorkerOptions: {}, getDocument: () => ({promise: Promise.resolve({numPages: 1, getPage: async () => page, destroy: async () => {destroyed = true;}})})}, PDFLib: {PDFDocument: {create: async () => doc}}},
+    getCanvas: () => ({getContext: () => ({})}),
+    canvasToBlob: async (canvas, type, q) => {quality = q; return new Blob([new Uint8Array(10)]);},
+  });
+  vm.runInContext(source('renderPdfToImagePdf'), context);
+  await context.renderPdfToImagePdf(new ArrayBuffer(0), 'high', 2000000, () => {}, false, {dpiScale: 0.24, qualityDelta: -0.42, minimumQuality: 0.28});
+  assert.equal(quality, 0.28);
+  assert.deepEqual([...pageSize], [612, 792]);
+  // getViewport(scale:1) is also used to preserve the physical page size.
+  assert.equal(scale, 1);
+  assert.equal(scales[0], 60 / 72);
+  assert.equal(destroyed, true);
+});

@@ -3401,93 +3401,30 @@
 			return results;
 		}
 
-		/** Image -> single-page PDF, embedding PNG when transparency must be preserved, else JPEG. */
+		/** Build an image PDF once; all PDF outputs share the admission compressor. */
 		async function convertImageToPdf(file, onProgress) {
-			const originalSize = file.size;
-			const baseName = file.name.replace(/\.[^.]+$/, "");
 			let bitmap = null;
-
 			try {
 				bitmap = await createImageBitmap(file);
-
-				// Guard against Canvas/GPU OOM on extreme-resolution images, same as compressImage.
-				const MAX_SAFE_PIXELS = 40000000;
-				const MAX_SAFE_DIMENSION = 4096;
-				if (bitmap.width * bitmap.height > MAX_SAFE_PIXELS) {
-					const scale = Math.min(MAX_SAFE_DIMENSION / bitmap.width, MAX_SAFE_DIMENSION / bitmap.height, 1);
-					const safeWidth = Math.max(1, Math.round(bitmap.width * scale));
-					const safeHeight = Math.max(1, Math.round(bitmap.height * scale));
-					const resizedBitmap = await createImageBitmap(bitmap, {
-						resizeWidth: safeWidth,
-						resizeHeight: safeHeight,
-						resizeQuality: "high",
-					});
-					bitmap.close();
-					bitmap = resizedBitmap;
+				if (bitmap.width * bitmap.height > 40_000_000) {
+					const scale = Math.min(4096 / bitmap.width, 4096 / bitmap.height, 1);
+					const resized = await createImageBitmap(bitmap, { resizeWidth: Math.max(1, Math.round(bitmap.width * scale)), resizeHeight: Math.max(1, Math.round(bitmap.height * scale)), resizeQuality: "high" });
+					bitmap.close(); bitmap = resized;
 				}
-
-				onProgress("Analyzing image…", 15);
+				onProgress("Building PDF…", 10);
+				const doc = await window.PDFLib.PDFDocument.create();
 				const hasAlpha = analyzeImageProfile(bitmap).hasAlpha;
-
-				const buildPdfAt = async (width, height, quality) => {
-					const { canvas } = drawBitmap(bitmap, width, height, true);
-					const pdfDoc = await window.PDFLib.PDFDocument.create();
-					let embedded;
-					if (hasAlpha) {
-						const pngBuffer = await (await canvasToBlob(canvas, "image/png", 1)).arrayBuffer();
-						embedded = await pdfDoc.embedPng(pngBuffer);
-					} else {
-						const jpgBuffer = await (await canvasToBlob(canvas, "image/jpeg", quality)).arrayBuffer();
-						embedded = await pdfDoc.embedJpg(jpgBuffer);
-					}
-					const page = pdfDoc.addPage([width, height]);
-					page.drawImage(embedded, { x: 0, y: 0, width, height });
-					const pdfBytes = await pdfDoc.save({ useObjectStreams: true, addDefaultPage: false });
-					return new Blob([pdfBytes], { type: "application/pdf" });
-				};
-
-				onProgress("Building PDF…", 40);
-				let pdfBlob = await buildPdfAt(bitmap.width, bitmap.height, MAX_JPEG_QUALITY);
-
-				if (pdfBlob.size > TARGET_MAX && !hasAlpha) {
-					onProgress("Compressing to fit size limit…", 55);
-					let low = MIN_JPEG_QUALITY;
-					let high = MAX_JPEG_QUALITY;
-					for (let i = 0; i < 8; i += 1) {
-						const mid = (low + high) / 2;
-						const candidate = await buildPdfAt(bitmap.width, bitmap.height, mid);
-						if (candidate.size <= TARGET_MAX) {
-							pdfBlob = candidate;
-							low = mid;
-						} else {
-							high = mid;
-						}
-					}
-				}
-
-				if (pdfBlob.size > TARGET_MAX) {
-					const scales = [0.85, 0.7, 0.55, 0.42, 0.32, 0.24, 0.18];
-					for (let index = 0; index < scales.length && pdfBlob.size > TARGET_MAX; index += 1) {
-						const scale = scales[index];
-						const width = Math.max(1, Math.round(bitmap.width * scale));
-						const height = Math.max(1, Math.round(bitmap.height * scale));
-						onProgress(`Scaling to ${width}×${height}…`, 70 + index * 4);
-						const candidate = await buildPdfAt(width, height, MIN_JPEG_QUALITY);
-						if (candidate.size < pdfBlob.size) {
-							pdfBlob = candidate;
-						}
-					}
-				}
-
-				if (pdfBlob.size > TARGET_MAX) {
-					throw new Error("Unable to convert this image to a PDF under the size limit.");
-				}
-
-				onProgress("Finalizing…", 95);
-				return makeResult(pdfBlob, `${baseName}.pdf`, "application/pdf", originalSize, "Image -> PDF", true);
-			} finally {
-				if (bitmap) bitmap.close();
-			}
+				const { canvas } = drawBitmap(bitmap, bitmap.width, bitmap.height, true);
+				const image = await canvasToBlob(canvas, hasAlpha ? "image/png" : "image/jpeg", MAX_JPEG_QUALITY);
+				const bytes = await image.arrayBuffer();
+				const embedded = hasAlpha ? await doc.embedPng(bytes) : await doc.embedJpg(bytes);
+				const page = doc.addPage([bitmap.width, bitmap.height]);
+				page.drawImage(embedded, { x: 0, y: 0, width: bitmap.width, height: bitmap.height });
+				const name = file.name.replace(/\.[^.]+$/, ".pdf");
+				const pdfFile = new File([await doc.save({ useObjectStreams: true, addDefaultPage: false })], name, { type: "application/pdf" });
+				const result = await compressPdfSmart(pdfFile, AUTO_LEVEL, onProgress);
+				return makeResult(result.blob, name, "application/pdf", file.size, "Image -> PDF", true);
+			} finally { if (bitmap) bitmap.close(); }
 		}
 
 		// Compress each supported format and reject outputs above the admission limit.
@@ -3506,8 +3443,7 @@
 
 			try {
 				if (isPdfFile(file)) {
-					// Smart chain: early exit -> analyze -> vector-preserving path for
-					// text-heavy docs -> legacy image/DPI path otherwise -> guaranteed last resort.
+					// Preserve text while optimizing images, then use the shared fallback.
 					result = await compressPdfSmart(file, levelKey, noopSafeProgress);
 				} else {
 					const profile = await detectInternalFileProfile(file);
@@ -3518,11 +3454,7 @@
 					} else if (isImageFile(file)) {
 						if (file.userPreference === "pdf") {
 							noopSafeProgress("Converting image to PDF…", 10);
-							result = await imageToLowDpiPdf(file, noopSafeProgress);
-							if (!result || result.mime !== "application/pdf") {
-								noopSafeProgress("Ensuring PDF format…", 80);
-								result = await imageToLowDpiPdf(file, noopSafeProgress);
-							}
+							result = await convertImageToPdf(file, noopSafeProgress);
 						} else {
 							result = await compressImage(file, levelKey, noopSafeProgress);
 						}
@@ -3533,15 +3465,6 @@
 			} catch (error) {
 				result = null;
 				processingError = error;
-			}
-
-			// PDF routes own their fallback; only image-to-PDF conversion retries here.
-			if (!result && isImageFile(file) && file.userPreference === "pdf") {
-				try {
-					result = await buildGuaranteedFallbackPdf(file, noopSafeProgress);
-				} catch (fallbackError) {
-					processingError = fallbackError || processingError;
-				}
 			}
 
 			if (!result) {
@@ -3598,12 +3521,12 @@
 				const pageCount = loadedPdf.numPages;
 				const byteBudgetPerPage = TARGET_MAX / Math.max(pageCount, 1);
 
-				let dpi = Math.max(72, Math.round(level.pdfDpi * tuning.dpiScale));
+				let dpi = Math.max(60, Math.round(level.pdfDpi * tuning.dpiScale));
 				if (byteBudgetPerPage < 20_000) dpi = Math.min(dpi, 72);
 				else if (byteBudgetPerPage < 40_000) dpi = Math.min(dpi, 84);
 				else if (byteBudgetPerPage < 70_000) dpi = Math.min(dpi, 96);
 
-				const minimumPageQuality = Math.max(0.35, tuning.minimumQuality ?? MIN_JPEG_QUALITY);
+				const minimumPageQuality = Math.max(0.28, tuning.minimumQuality ?? MIN_JPEG_QUALITY);
 				let pageQuality = Math.max(minimumPageQuality, level.pdfQuality + tuning.qualityDelta);
 				const scale = dpi / 72;
 				const rebuiltPdf = await window.PDFLib.PDFDocument.create();
@@ -3723,15 +3646,12 @@
 					if (bitmap) bitmap.close();
 				}
 				if (pdf) {
-					return makeResult(pdf, `${baseName}_compressed.pdf`, "application/pdf", originalSize, "Guaranteed fallback", true);
+					return makeResult(pdf, `${baseName}_compressed.pdf`, "application/pdf", originalSize, "Rasterized (reduced quality fallback)", true);
 				}
 			}
 
 			if (isPdfFile(file)) {
 				const buffer = await file.arrayBuffer();
-				const pdfjs = window.pdfjsLib;
-				pdfjs.GlobalWorkerOptions.workerSrc = "https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.js";
-				const loadedPdf = await pdfjs.getDocument({ data: buffer.slice(0) }).promise;
 				const attempts = [
 					{ dpiScale: 0.5, qualityDelta: -0.24, minimumQuality: 0.42 },
 					{ dpiScale: 0.4, qualityDelta: -0.3, minimumQuality: 0.36 },
@@ -3741,7 +3661,7 @@
 				for (const tuning of attempts) {
 					const pdf = await renderPdfToImagePdf(buffer, "high", originalSize, onProgress, false, tuning);
 					if (pdf.size <= TARGET_MAX) {
-						return makeResult(pdf, `${baseName}_compressed.pdf`, "application/pdf", originalSize, "Guaranteed fallback", true);
+						return makeResult(pdf, `${baseName}_compressed.pdf`, "application/pdf", originalSize, "Rasterized (reduced quality fallback)", true);
 					}
 				}
 				throw new Error("Unable to compress this PDF without losing pages. The original document was not changed.");
@@ -3772,7 +3692,7 @@
 					return { canvas, width, height };
 				});
 				if (pdf) {
-					return makeResult(pdf, `${baseName}_compressed.pdf`, "application/pdf", originalSize, "Guaranteed fallback", true);
+					return makeResult(pdf, `${baseName}_compressed.pdf`, "application/pdf", originalSize, "Rasterized (reduced quality fallback)", true);
 				}
 			}
 
@@ -3935,72 +3855,6 @@
 			return makeResult(bestBlob, `${baseName}_lowdpi.pdf`, "application/pdf", originalSize, "Image-PDF (cap tuned)", true);
 		}
 
-		async function imageToLowDpiPdf(file, onProgress) {
-			let bitmap = null;
-			try {
-				bitmap = await createImageBitmap(file);
-				const baseName = file.name.replace(/\.[^.]+$/, "");
-				const originalSize = file.size;
-				const cap = getEffectiveCap(originalSize);
-				const hasAlpha = analyzeImageProfile(bitmap).hasAlpha;
-
-				onProgress("Applying fallback: JPG rasterization…", 78);
-
-				const attempts = [
-					{ maxDimension: 1400, quality: 0.62 },
-					{ maxDimension: 1650, quality: 0.7 },
-					{ maxDimension: 1900, quality: 0.77 },
-					{ maxDimension: 2200, quality: 0.84 },
-					{ maxDimension: 2550, quality: 0.9 },
-					{ maxDimension: 3000, quality: MAX_JPEG_QUALITY },
-				];
-
-				let bestBlob = null;
-
-				for (let attemptIndex = 0; attemptIndex < attempts.length; attemptIndex += 1) {
-					const attempt = attempts[attemptIndex];
-					onProgress(`Applying fallback: JPG rasterization (${attemptIndex + 1}/${attempts.length})…`, 78 + Math.round((attemptIndex / attempts.length) * 18));
-
-					const ratio = Math.min(attempt.maxDimension / bitmap.width, attempt.maxDimension / bitmap.height, 1);
-					const width = Math.max(1, Math.round(bitmap.width * ratio));
-					const height = Math.max(1, Math.round(bitmap.height * ratio));
-
-					const { canvas } = drawBitmap(bitmap, width, height, true);
-					const imageType = hasAlpha ? "image/png" : "image/jpeg";
-					const pageImage = await canvasToBlob(canvas, imageType, hasAlpha ? 1 : attempt.quality);
-					const pageBuffer = await pageImage.arrayBuffer();
-
-					const pdfDoc = await window.PDFLib.PDFDocument.create();
-					const embedded = hasAlpha ? await pdfDoc.embedPng(pageBuffer) : await pdfDoc.embedJpg(pageBuffer);
-					const page = pdfDoc.addPage([width, height]);
-					page.drawImage(embedded, { x: 0, y: 0, width, height });
-
-					const pdfBytes = await pdfDoc.save({
-						useObjectStreams: true,
-						addDefaultPage: false,
-					});
-
-					const candidate = new Blob([pdfBytes], { type: "application/pdf" });
-					if (candidate.size <= cap) {
-						if (!bestBlob || candidate.size > bestBlob.size) {
-							bestBlob = candidate;
-						}
-						if (isNearCap(candidate.size, cap)) {
-							break;
-						}
-					}
-				}
-
-				if (!bestBlob) {
-					throw new Error("Unable to create a cap-safe fallback PDF from image.");
-				}
-
-				return makeResult(bestBlob, `${baseName}_lowdpi.pdf`, "application/pdf", originalSize, "JPG -> PDF (cap tuned)", true);
-			} finally {
-				if (bitmap) bitmap.close();
-			}
-		}
-
 		let pdfjsWorkerConfigured = false;
 		function ensurePdfjsWorker() {
 			if (pdfjsWorkerConfigured) return;
@@ -4146,7 +4000,7 @@
 				}
 				// ponytail: fixed pixel ceilings; use placement-based DPI if small embedded images need shrinking.
 				// Bitmaps are reused across attempts; decode per image if large PDFs exhaust memory.
-				const attempts = [[Infinity, 0.9], [2400, 0.9], [1800, 0.85], [1400, 0.82], [1000, 0.75], [800, 0.65]];
+				const attempts = [[Infinity, 0.9], [2400, 0.9], [1800, 0.85], [1400, 0.82], [1000, 0.75], [800, 0.65], [800, 0.5], [650, 0.42], [500, 0.35]];
 				for (let attempt = 0; attempt < attempts.length; attempt += 1) {
 					const [maxDimension, quality] = attempts[attempt];
 					onProgress(`Optimizing embedded images (${attempt + 1}/${attempts.length})…`, 15 + attempt * 10);
