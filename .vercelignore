@@ -1,2 +1,5 @@
 api/*.test.js
+pdf-compression.test.js
+tmp/
+output/
 node_modules/

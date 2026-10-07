@@ -3088,7 +3088,7 @@
 				mime,
 				originalSize,
 				compressedSize: blob.size,
-				savingsPercent: Math.max(0, Math.round(((originalSize - blob.size) / originalSize) * 100)),
+				savingsPercent: originalSize ? Math.round(((originalSize - blob.size) / originalSize) * 100) : 0,
 				codecLabel,
 				renderedPdf,
 			};
@@ -3490,20 +3490,7 @@
 			}
 		}
 
-		/**
-		 * UNIFIED MASTER COMPRESSOR — the single top-level routing entry point for
-		 * any file that must end up within TARGET_MAX. Every mode (Compress, Merge,
-		 * Split extraction, Convert PDF->PDF) funnels through this so the exact same
-		 * vector-preserving chain is applied everywhere:
-		 *   - PDF            → compressPdfSmart (early-exit / analyze / vector / raster fallbacks)
-		 *   - Image → PDF    → imageToLowDpiPdf when the user prefers PDF output
-		 *   - Text-like      → compressTextFile (GZIP; never rasterized)
-		 *   - Images         → compressImage
-		 * Always returns the standard result object consumed by renderBatchResults:
-		 *   { blob, fileName, mime, originalSize, compressedSize, savingsPercent, codecLabel, renderedPdf }
-		 * Errors are caught and re-thrown as a standardized Error message so callers
-		 * push a clean { file, error } entry instead of crashing the UI.
-		 */
+		// Compress each supported format and reject outputs above the admission limit.
 		async function compressAnyFile(file, onProgress = () => {}, levelKey = AUTO_LEVEL) {
 			const noopSafeProgress = typeof onProgress === "function" ? onProgress : () => {};
 
@@ -3548,8 +3535,8 @@
 				processingError = error;
 			}
 
-			// Last-resort guarantee: PDF-bound routes must always produce a cap-safe PDF.
-			if (!result && (isPdfFile(file) || (isImageFile(file) && file.userPreference === "pdf"))) {
+			// PDF routes own their fallback; only image-to-PDF conversion retries here.
+			if (!result && isImageFile(file) && file.userPreference === "pdf") {
 				try {
 					result = await buildGuaranteedFallbackPdf(file, noopSafeProgress);
 				} catch (fallbackError) {
@@ -3565,6 +3552,7 @@
 				);
 			}
 
+			if (result.blob.size > TARGET_MAX) throw new Error("Unable to meet the 1 MB admission limit. No oversized download was created.");
 			return result;
 		}
 
@@ -3587,41 +3575,6 @@
 			return convertAndCompressImage(file, targetFormat, onProgress);
 		}
 
-		async function pdfHasReadableText(fileBuffer) {
-			const pdfjs = window.pdfjsLib;
-			pdfjs.GlobalWorkerOptions.workerSrc = "https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.js";
-			const loadedPdf = await pdfjs.getDocument({ data: fileBuffer.slice(0) }).promise;
-			const pagesToCheck = Math.min(3, loadedPdf.numPages);
-			let textItems = 0;
-
-			for (let pageNumber = 1; pageNumber <= pagesToCheck; pageNumber += 1) {
-				const page = await loadedPdf.getPage(pageNumber);
-				const content = await page.getTextContent();
-				textItems += content.items?.length || 0;
-			}
-
-			return textItems >= 25;
-		}
-
-		async function detectPdfScanStyle(fileBuffer) {
-			const pdfjs = window.pdfjsLib;
-			pdfjs.GlobalWorkerOptions.workerSrc = "https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.js";
-			const loadedPdf = await pdfjs.getDocument({ data: fileBuffer.slice(0) }).promise;
-			const page = await loadedPdf.getPage(1);
-			const viewport = page.getViewport({ scale: 0.35 });
-			const canvas = getCanvas(Math.max(1, Math.round(viewport.width)), Math.max(1, Math.round(viewport.height)), true);
-			const ctx = canvas.getContext("2d");
-			await page.render({ canvasContext: ctx, viewport }).promise;
-			const { data } = ctx.getImageData(0, 0, canvas.width, canvas.height);
-			let grayLike = 0;
-			for (let index = 0; index < data.length; index += 4) {
-				const max = Math.max(data[index], data[index + 1], data[index + 2]);
-				const min = Math.min(data[index], data[index + 1], data[index + 2]);
-				if (max - min < 14) grayLike += 1;
-			}
-			return grayLike / Math.max(data.length / 4, 1) > 0.88;
-		}
-
 		function convertContextToGrayscale(ctx, width, height) {
 			const imageData = ctx.getImageData(0, 0, width, height);
 			const { data } = imageData;
@@ -3635,198 +3588,77 @@
 			ctx.putImageData(imageData, 0, 0);
 		}
 
-		async function pdfLibPass(fileBuffer, levelKey, onProgress) {
-			const pdfDoc = await window.PDFLib.PDFDocument.load(fileBuffer, {
-				ignoreEncryption: true,
-				updateMetadata: false,
-			});
-
-			pdfDoc.setTitle("");
-			pdfDoc.setAuthor("");
-			pdfDoc.setSubject("");
-			pdfDoc.setKeywords([]);
-			pdfDoc.setProducer("");
-			pdfDoc.setCreator("");
-
-			const totalPages = pdfDoc.getPageCount();
-			for (let i = 0; i < totalPages; i += 1) {
-				if (i % 5 === 0) {
-					onProgress(`Optimizing PDF objects (${i + 1}/${totalPages})…`, 20 + Math.round((i / Math.max(totalPages, 1)) * 20));
-				}
-			}
-
-			const bytes = await pdfDoc.save({
-				useObjectStreams: true,
-				addDefaultPage: false,
-				objectsPerTick: levelKey === "high" ? 10 : 30,
-			});
-
-			return new Blob([bytes], { type: "application/pdf" });
-		}
-
 		async function renderPdfToImagePdf(fileBuffer, levelKey, originalSize, onProgress, scanMode = false, tuning = { dpiScale: 1, qualityDelta: 0, minimumQuality: MIN_JPEG_QUALITY }) {
 			const level = LEVELS[levelKey];
 			const pdfjs = window.pdfjsLib;
 			pdfjs.GlobalWorkerOptions.workerSrc = "https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.js";
 
 			const loadedPdf = await pdfjs.getDocument({ data: fileBuffer.slice(0) }).promise;
-			const pageCount = loadedPdf.numPages;
-			const byteBudgetPerPage = TARGET_MAX / Math.max(pageCount, 1);
+			try {
+				const pageCount = loadedPdf.numPages;
+				const byteBudgetPerPage = TARGET_MAX / Math.max(pageCount, 1);
 
-			let dpi = Math.max(72, Math.round(level.pdfDpi * tuning.dpiScale));
-			if (byteBudgetPerPage < 20_000) dpi = Math.min(dpi, 72);
-			else if (byteBudgetPerPage < 40_000) dpi = Math.min(dpi, 84);
-			else if (byteBudgetPerPage < 70_000) dpi = Math.min(dpi, 96);
+				let dpi = Math.max(72, Math.round(level.pdfDpi * tuning.dpiScale));
+				if (byteBudgetPerPage < 20_000) dpi = Math.min(dpi, 72);
+				else if (byteBudgetPerPage < 40_000) dpi = Math.min(dpi, 84);
+				else if (byteBudgetPerPage < 70_000) dpi = Math.min(dpi, 96);
 
-			const minimumPageQuality = Math.max(0.35, tuning.minimumQuality ?? MIN_JPEG_QUALITY);
-			let pageQuality = Math.max(minimumPageQuality, level.pdfQuality + tuning.qualityDelta);
-			const scale = dpi / 72;
-			const rebuiltPdf = await window.PDFLib.PDFDocument.create();
+				const minimumPageQuality = Math.max(0.35, tuning.minimumQuality ?? MIN_JPEG_QUALITY);
+				let pageQuality = Math.max(minimumPageQuality, level.pdfQuality + tuning.qualityDelta);
+				const scale = dpi / 72;
+				const rebuiltPdf = await window.PDFLib.PDFDocument.create();
 
-			for (let pageNumber = 1; pageNumber <= pageCount; pageNumber += 1) {
-				onProgress(`Rendering page ${pageNumber}/${pageCount}…`, 46 + Math.round((pageNumber / pageCount) * 46));
-				const page = await loadedPdf.getPage(pageNumber);
-				const viewport = page.getViewport({ scale });
-				const canvas = getCanvas(Math.round(viewport.width), Math.round(viewport.height), true);
-				const ctx = canvas.getContext("2d");
-				await page.render({ canvasContext: ctx, viewport }).promise;
-				if (scanMode) {
-					convertContextToGrayscale(ctx, canvas.width, canvas.height);
-				}
+				for (let pageNumber = 1; pageNumber <= pageCount; pageNumber += 1) {
+					onProgress(`Rendering page ${pageNumber}/${pageCount}…`, 46 + Math.round((pageNumber / pageCount) * 46));
+					const page = await loadedPdf.getPage(pageNumber);
+					const viewport = page.getViewport({ scale });
+					const canvas = getCanvas(Math.round(viewport.width), Math.round(viewport.height), true);
+					const ctx = canvas.getContext("2d");
+					await page.render({ canvasContext: ctx, viewport }).promise;
+					if (scanMode) {
+						convertContextToGrayscale(ctx, canvas.width, canvas.height);
+					}
 
-				const remainingPages = pageCount - pageNumber + 1;
-				const roughPerPageBudget = TARGET_MAX / remainingPages;
-				if (roughPerPageBudget < byteBudgetPerPage * 0.8) {
-					pageQuality = Math.max(minimumPageQuality, pageQuality - 0.03);
-				}
+					const remainingPages = pageCount - pageNumber + 1;
+					const roughPerPageBudget = TARGET_MAX / remainingPages;
+					if (roughPerPageBudget < byteBudgetPerPage * 0.8) {
+						pageQuality = Math.max(minimumPageQuality, pageQuality - 0.03);
+					}
 
-				let pageBytes;
-				if (state.codecs.jpeg?.encode) {
-					try {
-						const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-						pageBytes = await state.codecs.jpeg.encode(imageData, {
-							quality: Math.round(pageQuality * 100),
-						});
-					} catch (error) {
+					let pageBytes;
+					if (state.codecs.jpeg?.encode) {
+						try {
+							const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+							pageBytes = await state.codecs.jpeg.encode(imageData, {
+								quality: Math.round(pageQuality * 100),
+							});
+						} catch (error) {
+							const blob = await canvasToBlob(canvas, "image/jpeg", pageQuality);
+							pageBytes = await blob.arrayBuffer();
+						}
+					} else {
 						const blob = await canvasToBlob(canvas, "image/jpeg", pageQuality);
 						pageBytes = await blob.arrayBuffer();
 					}
-				} else {
-					const blob = await canvasToBlob(canvas, "image/jpeg", pageQuality);
-					pageBytes = await blob.arrayBuffer();
+
+					const embedded = await rebuiltPdf.embedJpg(pageBytes);
+					const pageSize = page.getViewport({ scale: 1 });
+					const nextPage = rebuiltPdf.addPage([pageSize.width, pageSize.height]);
+					nextPage.drawImage(embedded, {
+						x: 0,
+						y: 0,
+						width: pageSize.width,
+						height: pageSize.height,
+					});
 				}
 
-				const embedded = await rebuiltPdf.embedJpg(pageBytes);
-				const nextPage = rebuiltPdf.addPage([viewport.width, viewport.height]);
-				nextPage.drawImage(embedded, {
-					x: 0,
-					y: 0,
-					width: viewport.width,
-					height: viewport.height,
+				const rebuiltBytes = await rebuiltPdf.save({
+					useObjectStreams: true,
+					addDefaultPage: false,
 				});
-			}
 
-			const rebuiltBytes = await rebuiltPdf.save({
-				useObjectStreams: true,
-				addDefaultPage: false,
-			});
-
-			return new Blob([rebuiltBytes], { type: "application/pdf" });
-		}
-
-		async function compressPdf(file, levelKey, onProgress, options = {}) {
-			const settings = {
-				preferTextPreservation: true,
-				preserveColor: true,
-				...options,
-			};
-			const originalSize = file.size;
-			const baseName = file.name.replace(/\.pdf$/i, "");
-			const buffer = await file.arrayBuffer();
-
-			onProgress("Loading PDF…", 8);
-			let bestBlob = await pdfLibPass(buffer, levelKey, onProgress);
-			let renderedPdf = false;
-			let mayRasterize = true;
-
-			try {
-				mayRasterize = !settings.preferTextPreservation || !(await pdfHasReadableText(buffer));
-			} catch (error) {
-				mayRasterize = true;
-			}
-
-			if (!isWithinTarget(bestBlob.size, originalSize) && mayRasterize) {
-				onProgress("Rebuilding PDF through image rendering…", 44);
-				try {
-					const scanMode = settings.preserveColor
-						? false
-						: await detectPdfScanStyle(buffer).catch(() => false);
-					const attempts = settings.preferTextPreservation
-						? [
-							{ dpiScale: 1, qualityDelta: 0, minimumQuality: MIN_JPEG_QUALITY },
-							{ dpiScale: 0.84, qualityDelta: -0.06, minimumQuality: 0.56 },
-							{ dpiScale: 0.72, qualityDelta: -0.12, minimumQuality: 0.5 },
-						]
-						: [
-							{ dpiScale: 0.92, qualityDelta: -0.05, minimumQuality: 0.56 },
-							{ dpiScale: 0.76, qualityDelta: -0.12, minimumQuality: 0.5 },
-							{ dpiScale: 0.62, qualityDelta: -0.18, minimumQuality: 0.46 },
-							{ dpiScale: 0.5, qualityDelta: -0.24, minimumQuality: 0.42 },
-							{ dpiScale: 0.4, qualityDelta: -0.3, minimumQuality: 0.38 },
-						];
-					for (const tuning of attempts) {
-						const renderedBlob = await renderPdfToImagePdf(buffer, levelKey, originalSize, onProgress, scanMode, tuning);
-						if (renderedBlob.size < bestBlob.size) {
-							bestBlob = renderedBlob;
-							renderedPdf = true;
-						}
-						if (bestBlob.size <= TARGET_MAX) {
-							break;
-						}
-					}
-				} catch (error) {
-				}
-			}
-
-			if (!bestBlob) {
-				throw new Error("Unable to compress this PDF.");
-			}
-
-			// Hard cap enforcement: if still above 950 KB, try more aggressive raster attempts.
-			if (bestBlob.size > TARGET_MAX) {
-				onProgress("Applying final cap enforcement…", 94);
-				const strictAttempts = [
-					{ dpiScale: 0.62, qualityDelta: -0.18, minimumQuality: 0.48 },
-					{ dpiScale: 0.5, qualityDelta: -0.24, minimumQuality: 0.42 },
-					{ dpiScale: 0.4, qualityDelta: -0.3, minimumQuality: 0.36 },
-					{ dpiScale: 0.32, qualityDelta: -0.36, minimumQuality: 0.32 },
-				];
-
-				for (const tuning of strictAttempts) {
-					try {
-						const strictBlob = await renderPdfToImagePdf(
-							buffer,
-							"high",
-							originalSize,
-							onProgress,
-							false,
-							tuning
-						);
-						if (strictBlob.size < bestBlob.size) {
-							bestBlob = strictBlob;
-							renderedPdf = true;
-						}
-						if (bestBlob.size <= TARGET_MAX) {
-							break;
-						}
-					} catch (error) {
-					}
-				}
-
-				// Do not fail here. A guaranteed final fallback runs in compressFile.
-			}
-
-			return makeResult(bestBlob, `${baseName}_compressed.pdf`, "application/pdf", originalSize, state.codecs.label, renderedPdf);
+				return new Blob([rebuiltBytes], { type: "application/pdf" });
+			} finally { await loadedPdf.destroy(); }
 		}
 
 		async function jpegBlobToSinglePagePdf(jpegBlob, width, height) {
@@ -4169,56 +4001,6 @@
 			}
 		}
 
-		async function pdfToLowerDpiFallback(file, onProgress) {
-			const originalSize = file.size;
-			const baseName = file.name.replace(/\.pdf$/i, "");
-			const buffer = await file.arrayBuffer();
-			const cap = getEffectiveCap(originalSize);
-
-			onProgress("Applying fallback: lower DPI raster PDF…", 78);
-
-			const attempts = [
-				{ dpiScale: 0.72, qualityDelta: -0.16, minimumQuality: 0.52 },
-				{ dpiScale: 0.84, qualityDelta: -0.1, minimumQuality: 0.58 },
-				{ dpiScale: 0.96, qualityDelta: -0.06, minimumQuality: 0.64 },
-				{ dpiScale: 1.1, qualityDelta: -0.02, minimumQuality: 0.7 },
-				{ dpiScale: 1.22, qualityDelta: 0, minimumQuality: 0.76 },
-				{ dpiScale: 1.35, qualityDelta: 0.04, minimumQuality: 0.82 },
-			];
-
-			let bestBlob = null;
-
-			for (let attemptIndex = 0; attemptIndex < attempts.length; attemptIndex += 1) {
-				const tuning = attempts[attemptIndex];
-				onProgress(`Applying fallback: lower DPI raster PDF (${attemptIndex + 1}/${attempts.length})…`, 78 + Math.round((attemptIndex / attempts.length) * 18));
-
-				const candidate = await renderPdfToImagePdf(
-					buffer,
-					"high",
-					originalSize,
-					onProgress,
-					false,
-					tuning
-				);
-
-				if (candidate.size <= cap) {
-					if (!bestBlob || candidate.size > bestBlob.size) {
-						bestBlob = candidate;
-					}
-					if (isNearCap(candidate.size, cap)) {
-						break;
-					}
-				}
-			}
-
-			if (!bestBlob) {
-				throw new Error("Unable to create a cap-safe fallback PDF from source PDF.");
-			}
-
-			return makeResult(bestBlob, `${baseName}_lowdpi.pdf`, "application/pdf", originalSize, "Raster PDF (cap tuned)", true);
-		}
-
-		// Configure the pdf.js worker exactly once per page load.
 		let pdfjsWorkerConfigured = false;
 		function ensurePdfjsWorker() {
 			if (pdfjsWorkerConfigured) return;
@@ -4226,121 +4008,172 @@
 			pdfjsWorkerConfigured = true;
 		}
 
-		/**
-		 * Samples the first 3 pages of a PDF to decide whether it is text-heavy
-		 * (vector transcripts, official documents) or image-heavy (scans/photos).
-		 * Never throws: encrypted/damaged files return { encrypted: true } so the
-		 * dispatcher can fall through to the legacy compressPdf path.
-		 */
-		async function analyzePdfContent(file) {
-			const pdfjs = window.pdfjsLib;
+		// Unusual colour spaces and transparency masks remain untouched.
+		async function pdfImageToBitmap(stream) {
+			const { PDFName, PDFArray, PDFRawStream, decodePDFRawStream } = window.PDFLib;
+			const value = (key) => stream.dict.lookup(PDFName.of(key));
+			const width = value("Width")?.asNumber();
+			const height = value("Height")?.asNumber();
+			const depth = value("BitsPerComponent")?.asNumber();
+			if (!Number.isInteger(width) || !Number.isInteger(height) || width < 1 || height < 1 || width * height > 40_000_000) return null;
+			if (["SMask", "Mask", "Decode", "ImageMask"].some((key) => stream.dict.has(PDFName.of(key)))) return null;
+			const filter = value("Filter")?.toString();
+			const space = value("ColorSpace");
+			if (filter === "/DCTDecode" && space?.toString() === "/DeviceRGB" && depth === 8) {
+				return createImageBitmap(new Blob([stream.contents], { type: "image/jpeg" }));
+			}
+			if (filter && filter !== "/FlateDecode") return null;
+			let colorType, colors, palette;
+			if (space?.toString() === "/DeviceRGB" && depth === 8) {
+				colorType = 2; colors = 3;
+			} else if (space?.toString() === "/DeviceGray" && [1, 2, 4, 8].includes(depth)) {
+				colorType = 0; colors = 1;
+			} else if (space instanceof PDFArray && space.lookup(0)?.toString() === "/Indexed"
+				&& space.lookup(1)?.toString() === "/DeviceRGB" && [1, 2, 4, 8].includes(depth)) {
+				colorType = 3; colors = 1;
+				const table = space.lookup(3);
+				palette = table instanceof PDFRawStream ? decodePDFRawStream(table).decode() : table.asBytes();
+				if (palette.length !== (space.lookup(2).asNumber() + 1) * 3 || palette.length > 768) return null;
+			} else return null;
+			const params = value("DecodeParms");
+			const parameter = (key, fallback) => params?.lookup(PDFName.of(key))?.asNumber() ?? fallback;
+			const predictor = parameter("Predictor", 1);
+			const rowBytes = Math.ceil(width * colors * depth / 8);
+			const raw = decodePDFRawStream(stream).decode();
+			let rows;
+			if (predictor === 1) {
+				if (raw.length !== rowBytes * height) return null;
+				rows = new Uint8Array((rowBytes + 1) * height);
+				for (let y = 0; y < height; y += 1) rows.set(raw.subarray(y * rowBytes, (y + 1) * rowBytes), y * (rowBytes + 1) + 1);
+			} else if (predictor >= 10 && predictor <= 15 && parameter("Columns", 1) === width
+				&& parameter("Colors", 1) === colors && parameter("BitsPerComponent", 8) === depth) {
+				if (raw.length !== (rowBytes + 1) * height) return null;
+				for (let y = 0; y < height; y += 1) if (raw[y * (rowBytes + 1)] > 4) return null;
+				rows = raw;
+			} else return null;
+			const header = new Uint8Array(13);
+			const view = new DataView(header.buffer);
+			view.setUint32(0, width); view.setUint32(4, height);
+			header[8] = depth; header[9] = colorType;
+			const compressed = new Uint8Array(await new Response(new Blob([rows]).stream().pipeThrough(new CompressionStream("deflate"))).arrayBuffer());
+			const chunks = [new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10]), pngChunk("IHDR", header)];
+			if (palette) chunks.push(pngChunk("PLTE", palette));
+			chunks.push(pngChunk("IDAT", compressed), pngChunk("IEND", new Uint8Array()));
+			return createImageBitmap(new Blob(chunks, { type: "image/png" }));
+		}
+
+		function pngChunk(type, data) {
+			const chunk = new Uint8Array(data.length + 12);
+			const view = new DataView(chunk.buffer);
+			view.setUint32(0, data.length);
+			chunk.set(new TextEncoder().encode(type), 4); chunk.set(data, 8);
+			let crc = 0xffffffff;
+			for (const byte of chunk.subarray(4, data.length + 8)) {
+				crc ^= byte;
+				for (let bit = 0; bit < 8; bit += 1) crc = (crc >>> 1) ^ ((crc & 1) ? 0xedb88320 : 0);
+			}
+			view.setUint32(data.length + 8, (crc ^ 0xffffffff) >>> 0);
+			return chunk;
+		}
+
+		async function pdfContentSnapshot(buffer) {
 			ensurePdfjsWorker();
-			let loadedPdf = null;
+			const doc = await window.pdfjsLib.getDocument({ data: buffer.slice(0) }).promise;
 			try {
-				const buffer = await file.arrayBuffer();
-				loadedPdf = await pdfjs.getDocument({ data: buffer.slice(0) }).promise;
-				const pageCount = loadedPdf.numPages;
-				const pagesToCheck = Math.min(3, pageCount);
-				const OPS = pdfjs.OPS || {};
-				const paintImageOps = new Set([
-					OPS.paintImageXObject,
-					OPS.paintInlineImageXObject,
-					OPS.paintJpegXObject,
-				].filter((op) => Number.isInteger(op)));
-
-				let textItems = 0;
-				let imageObjects = 0;
-
-				for (let pageNumber = 1; pageNumber <= pagesToCheck; pageNumber += 1) {
-					const page = await loadedPdf.getPage(pageNumber);
-					const content = await page.getTextContent();
-					textItems += content.items?.length || 0;
-					try {
-						const operatorList = await page.getOperatorList();
-						for (const fn of operatorList.fnArray) {
-							if (paintImageOps.has(fn)) imageObjects += 1;
-						}
-					} catch (error) {
-						// Operator list unavailable (e.g. encrypted stream): treat as no images found on this page.
-					}
+				const pages = [];
+				for (let number = 1; number <= doc.numPages; number += 1) {
+					const page = await doc.getPage(number);
+					pages.push({ view: page.view, rotation: page.rotate, text: (await page.getTextContent()).items.map((item) => item.str).join("\n") });
 					page.cleanup();
 				}
-
-				const avgText = textItems / Math.max(pagesToCheck, 1);
-				const avgImages = imageObjects / Math.max(pagesToCheck, 1);
-				const isTextHeavy = avgText > 50 && avgImages < 5;
-
-				return {
-					isTextHeavy,
-					isImageHeavy: !isTextHeavy && avgImages >= 5,
-					pageCount,
-					encrypted: false,
-				};
-			} catch (error) {
-				const isPasswordError = error?.name === "PasswordException"
-					|| error?.code === 15 /* PASSWORD_ENCRYPTION_ERROR */
-					|| /password/i.test(error?.message || "");
-				// Encrypted or unreadable PDF: never crash the pipeline. Route to the legacy path.
-				return {
-					isTextHeavy: false,
-					isImageHeavy: false,
-					pageCount: 0,
-					encrypted: isPasswordError,
-				};
-			} finally {
-				try {
-					await loadedPdf?.destroy();
-				} catch (error) {
-					// Ignore teardown failures — analysis result already decided.
-				}
-			}
+				return JSON.stringify(pages);
+			} finally { await doc.destroy(); }
 		}
 
-		/**
-		 * Lossless, vector-preserving optimization: strip metadata and re-save with
-		 * object streams (Flate compression of internal streams) — never rasterizes.
-		 */
-		async function optimizeTextHeavyPdf(file, onProgress) {
-			const originalSize = file.size;
-			const baseName = file.name.replace(/\.pdf$/i, "");
+		function removeUnusedPdfObjects(doc) {
+			const { PDFRef, PDFDict, PDFArray, PDFRawStream } = window.PDFLib;
+			const reachable = new Set();
+			function visit(object) {
+				if (object instanceof PDFRef) {
+					const key = object.toString();
+					if (reachable.has(key)) return;
+					reachable.add(key);
+					visit(doc.context.lookup(object));
+				} else if (object instanceof PDFRawStream) visit(object.dict);
+				else if (object instanceof PDFDict) for (const [, value] of object.entries()) visit(value);
+				else if (object instanceof PDFArray) for (const value of object.asArray()) visit(value);
+			}
+			for (const root of Object.values(doc.context.trailerInfo)) visit(root);
+			for (const [ref] of doc.context.enumerateIndirectObjects()) if (!reachable.has(ref.toString())) doc.context.delete(ref);
+		}
 
-			onProgress("Optimizing vectors (text preserved)…", 20);
+		async function deduplicatePdfImages(doc) {
+			const { PDFRef, PDFDict, PDFArray, PDFRawStream, PDFName } = window.PDFLib;
+			const seen = new Map(), aliases = new Map();
+			for (const [ref, stream] of doc.context.enumerateIndirectObjects()) {
+				if (!(stream instanceof PDFRawStream) || stream.dict.lookup(PDFName.of("Subtype"))?.toString() !== "/Image") continue;
+				const hash = new Uint8Array(await crypto.subtle.digest("SHA-256", stream.contents));
+				const key = stream.dict.toString() + Array.from(hash, (byte) => byte.toString(16).padStart(2, "0")).join("");
+				if (seen.has(key)) aliases.set(ref.toString(), seen.get(key));
+				else seen.set(key, ref);
+			}
+			function replace(object) {
+				if (object instanceof PDFRef) return aliases.get(object.toString()) || object;
+				if (object instanceof PDFRawStream) replace(object.dict);
+				else if (object instanceof PDFDict) for (const [key, value] of object.entries()) object.set(key, replace(value));
+				else if (object instanceof PDFArray) for (let i = 0; i < object.size(); i += 1) object.set(i, replace(object.get(i)));
+				return object;
+			}
+			for (const [, object] of doc.context.enumerateIndirectObjects()) replace(object);
+			for (const [ref] of doc.context.enumerateIndirectObjects()) if (aliases.has(ref.toString())) doc.context.delete(ref);
+		}
+
+		async function optimizePdfImages(file, onProgress) {
+			const { PDFDocument, PDFRawStream, PDFName } = window.PDFLib;
 			const buffer = await file.arrayBuffer();
-			let pdfDoc;
+			const doc = await PDFDocument.load(buffer, { updateMetadata: false });
+			doc.setTitle(""); doc.setAuthor(""); doc.setSubject(""); doc.setKeywords([]); doc.setProducer(""); doc.setCreator("");
+			removeUnusedPdfObjects(doc);
+			await deduplicatePdfImages(doc);
+			const images = [];
 			try {
-				pdfDoc = await window.PDFLib.PDFDocument.load(buffer, {
-					ignoreEncryption: true,
-					updateMetadata: false,
-				});
-			} catch (error) {
-				// pdf-lib could not load the document at all — surface a clear error so
-				// the dispatcher can fall through to the high-quality raster fallback.
-				throw new Error(`Vector optimization unavailable for this PDF (${error?.message || "load failed"}).`);
-			}
-
-			pdfDoc.setTitle("");
-			pdfDoc.setAuthor("");
-			pdfDoc.setSubject("");
-			pdfDoc.setKeywords([]);
-			pdfDoc.setProducer("");
-			pdfDoc.setCreator("");
-
-			const bytes = await pdfDoc.save({
-				useObjectStreams: true,
-				addDefaultPage: false,
-				objectsPerTick: 20,
-			});
-
-			const optimizedBlob = new Blob([bytes], { type: "application/pdf" });
-			onProgress("Vector optimization complete", 90);
-			return makeResult(optimizedBlob, `${baseName}_compressed.pdf`, "application/pdf", originalSize, "Vector-optimized (text preserved)", false);
+				for (const [ref, stream] of doc.context.enumerateIndirectObjects()) {
+					if (!(stream instanceof PDFRawStream) || stream.dict.lookup(PDFName.of("Subtype"))?.toString() !== "/Image") continue;
+					try {
+						const bitmap = await pdfImageToBitmap(stream);
+						if (bitmap) images.push({ ref, bitmap });
+					} catch (error) { /* Leave unsupported image data intact. */ }
+				}
+				// ponytail: fixed pixel ceilings; use placement-based DPI if small embedded images need shrinking.
+				// Bitmaps are reused across attempts; decode per image if large PDFs exhaust memory.
+				const attempts = [[Infinity, 0.9], [2400, 0.9], [1800, 0.85], [1400, 0.82], [1000, 0.75], [800, 0.65]];
+				for (let attempt = 0; attempt < attempts.length; attempt += 1) {
+					const [maxDimension, quality] = attempts[attempt];
+					onProgress(`Optimizing embedded images (${attempt + 1}/${attempts.length})…`, 15 + attempt * 10);
+					for (const { ref, bitmap } of images) {
+						const current = doc.context.lookup(ref);
+						if (!current) continue;
+						const ratio = Math.min(1, maxDimension / Math.max(bitmap.width, bitmap.height));
+						const jpg = await encodeJpeg(bitmap, Math.max(1, Math.round(bitmap.width * ratio)), Math.max(1, Math.round(bitmap.height * ratio)), quality);
+						if (jpg.size >= current.contents.length) continue;
+						const embedded = await doc.embedJpg(await jpg.arrayBuffer());
+						await embedded.embed();
+						doc.context.assign(ref, doc.context.lookup(embedded.ref));
+						doc.context.delete(embedded.ref);
+					}
+					await deduplicatePdfImages(doc);
+					const blob = new Blob([await doc.save({ useObjectStreams: true, addDefaultPage: false })], { type: "application/pdf" });
+					if (blob.size > TARGET_MAX) continue;
+					onProgress("Checking pages and searchable text…", 90);
+					if (await pdfContentSnapshot(buffer) !== await pdfContentSnapshot(await blob.arrayBuffer())) throw new Error("PDF content verification failed.");
+					const result = makeResult(blob, file.name.replace(/\.pdf$/i, "_compressed.pdf"), "application/pdf", file.size, "Images optimized (text preserved)");
+					return result;
+				}
+				return null;
+			} finally { for (const { bitmap } of images) bitmap.close(); }
 		}
 
-		/**
-		 * High-quality "last resort" rasterizer for text-heavy PDFs that still exceed
-		 * TARGET_MAX after lossless optimization. Starts at a high DPI/quality and
-		 * steps down only as much as needed to fit under getEffectiveCap(originalSize).
-		 */
+		// Last resort when optimizing embedded images cannot meet the limit.
 		async function smartRasterizeTextPdf(file, onProgress) {
 			const originalSize = file.size;
 			const baseName = file.name.replace(/\.pdf$/i, "");
@@ -4375,16 +4208,9 @@
 				);
 
 				if (candidate.size <= cap) {
-					// Keep the LARGEST (highest quality) candidate that still fits the cap.
-					if (!bestBlob || candidate.size > bestBlob.size) {
-						bestBlob = candidate;
-					}
-					if (isNearCap(candidate.size, cap)) {
-						break;
-					}
-				} else if (!bestBlob) {
-					// Track smallest over-cap candidate only in case nothing fits.
+					// Attempts are ordered by quality: the first fitting result wins.
 					bestBlob = candidate;
+					break;
 				}
 			}
 
@@ -4395,18 +4221,7 @@
 			return makeResult(bestBlob, `${baseName}_compressed.pdf`, "application/pdf", originalSize, "Rasterized (High Quality fallback)", true);
 		}
 
-		/**
-		 * Shared smart fallback chain for ALL PDF routes (main compress, split extraction,
-		 * merge). Preserves vectors/text whenever possible while still enforcing the hard
-		 * TARGET_MAX cap:
-		 *   1. Early exit — return ORIGINAL bytes untouched if already under the cap
-		 *      (preserves encryption, signatures and text layers).
-		 *   2. Analyze content; encrypted/unreadable files fall through to the legacy path.
-		 *   3. Text-heavy → lossless vector optimization; rasterize (high quality) only if
-		 *      it still exceeds TARGET_MAX or pdf-lib cannot load the document.
-		 *   4. Image-heavy/mixed → existing compressPdf + lower-DPI fallback behaviour.
-		 *   5. Last resort → buildGuaranteedFallbackPdf so a cap-safe result is always produced.
-		 */
+		// All PDF routes optimize images first and enforce the admission limit.
 		async function compressPdfSmart(file, levelKey, onProgress) {
 			const originalSize = file.size;
 
@@ -4418,44 +4233,28 @@
 					file.name,
 					"application/pdf",
 					originalSize,
-					"Already optimized",
+					"Original kept (within limit)",
 					false
 				);
 			}
 
-			// 2. Analyze content structure (text vs. raster). Never throws.
-			onProgress("Analyzing document structure...", 5);
-			const analysis = await analyzePdfContent(file);
-
-			// 3. TEXT-HEAVY PATH (e.g., transcripts): preserve vectors at all costs.
-			if (analysis.isTextHeavy && !analysis.encrypted) {
-				let textResult = null;
-				try {
-					textResult = await optimizeTextHeavyPdf(file, onProgress);
-				} catch (error) {
-					textResult = null; // Fall through to the high-quality rasterizer below.
-				}
-				if (textResult && textResult.compressedSize <= TARGET_MAX) {
-					return textResult;
-				}
-				// Only rasterize if lossless optimization wasn't enough (or failed).
-				return await smartRasterizeTextPdf(file, onProgress);
-			}
-
-			// 4. IMAGE-HEAVY / MIXED / ENCRYPTED PATH (existing behavior, still cap-enforced).
+			const buffer = await file.arrayBuffer();
+			const { PDFDocument, PDFName, PDFSignature } = window.PDFLib;
+			// Reject encrypted files rather than rewriting them with ignoreEncryption.
+			const source = await PDFDocument.load(buffer, { updateMetadata: false });
+			const signed = source.catalog.has(PDFName.of("AcroForm"))
+				&& source.getForm().getFields().some((field) => field instanceof PDFSignature && field.acroField.dict.has(PDFName.of("V")));
+			// Optimize shared images before considering whole-page rasterization.
 			let result = null;
 			try {
-				result = await compressPdf(file, levelKey, onProgress);
-				if (result.compressedSize > TARGET_MAX || !hasMeaningfulSavings(originalSize, result.compressedSize)) {
-					result = await pdfToLowerDpiFallback(file, onProgress);
-				}
-			} catch (error) {
-				result = null;
-			}
+				result = await optimizePdfImages(file, onProgress);
+			} catch (error) { console.warn("Image optimization unavailable:", error); }
 			if (!result) {
-				// 5. Last resort: guaranteed cap-safe raster PDF.
-				result = await buildGuaranteedFallbackPdf(file, onProgress);
+				try { result = await smartRasterizeTextPdf(file, onProgress); }
+				catch (error) { result = await buildGuaranteedFallbackPdf(file, onProgress); }
 			}
+			if (result.blob.size > TARGET_MAX) throw new Error("Unable to meet the 1 MB admission limit. No oversized download was created.");
+			result.signatureInvalidated = signed;
 			return result;
 		}
 
@@ -4565,7 +4364,7 @@
 
 			// Header engine-dot: show the "fallback" state when any result was rasterized.
 			const anyRasterized = state.results.some(
-				(entry) => !entry.error && /rasterized/i.test(entry.result?.codecLabel || "")
+				(entry) => !entry.error && entry.result?.renderedPdf
 			);
 			if (anyRasterized) setEngineStatus("fallback", "Canvas Fallback");
 
@@ -4580,22 +4379,24 @@
 						</div>
 					`;
 				} else {
-					const noGain = entry.result.savingsPercent <= 0;
+					const unchanged = entry.result.compressedSize === entry.result.originalSize;
 					const outputName = entry.result.fileName || entry.file.name;
-					const formatChanged = outputName !== entry.file.name;
+					const formatChanged = entry.result.mime !== entry.file.type;
 					const engineLabel = entry.result.codecLabel || "";
-					const wasRasterized = /rasterized/i.test(engineLabel);
+					const wasRasterized = entry.result.renderedPdf && isPdfFile(entry.file);
 					row.innerHTML = `
 						<div class="result-item-main">
 							<div class="result-item-name">${escapeHTML(outputName)}</div>
 							<div class="result-item-meta">
 								<span>${formatBytes(entry.result.originalSize)} -> ${formatBytes(entry.result.compressedSize)}</span>
-								<span>${Math.max(0, entry.result.savingsPercent)}% saved</span>
+								<span>${entry.result.savingsPercent >= 0 ? `${entry.result.savingsPercent}% saved` : `${Math.abs(entry.result.savingsPercent)}% larger`}</span>
+								${entry.result.compressedSize <= TARGET_MAX ? "<span>Within 1 MB admission limit</span>" : ""}
 								${engineLabel ? `<span class="engine-tag">${escapeHTML(engineLabel)}</span>` : ""}
 								${wasRasterized ? `<span class="engine-warning">⚠️ Rasterized to meet 1MB limit</span>` : ""}
 								${formatChanged ? `<span>Converted from ${escapeHTML(entry.file.name)}</span>` : ""}
 								${entry.result.renderedPdf && isPdfFile(entry.file) ? "<span>Rasterized PDF: text search and interactive content are not preserved.</span>" : ""}
-								${noGain ? "<span>Already optimized in original format.</span>" : ""}
+								${entry.result.signatureInvalidated ? "<span class='engine-warning'>Sharing copy: original digital signature verification and credential metadata are not preserved. Keep the original.</span>" : ""}
+								${unchanged ? "<span>Already within the size limit; original file kept.</span>" : ""}
 							</div>
 						</div>
 						<div class="result-item-actions">
@@ -4689,6 +4490,7 @@
 			hideSections();
 			$("result-section").classList.add("visible");
 			const successful = state.results.filter((entry) => entry.result);
+			$("result-title").textContent = successful.length ? MODE_CONFIG[state.mode].resultTitle : "Processing failed";
 			$("result-note").textContent = successful.length
 				? MODE_CONFIG[state.mode].resultNote
 				: "No files were processed successfully.";
@@ -4879,7 +4681,6 @@
 
 				if (isPdfFile(file)) {
 					const sourcePdf = await window.PDFLib.PDFDocument.load(await file.arrayBuffer(), {
-						ignoreEncryption: true,
 						updateMetadata: false,
 					});
 					const pageIndices = sourcePdf.getPageIndices();
@@ -4952,22 +4753,7 @@
 					results.push({ file: mergedFile, result: finalResult });
 				} catch (error) {
 					if (state.operationId !== operationId || state.mode !== operationMode) return;
-					try {
-						const mergedFile = await mergeFilesToPdf(files, (stage, pct) => {
-							reportProgress(stage, pct);
-						});
-						if (state.operationId !== operationId || state.mode !== operationMode) return;
-						const fallbackResult = await buildGuaranteedFallbackPdf(mergedFile, (stage, pct) => {
-							reportProgress(stage, 70 + pct * 0.3);
-						});
-						if (state.operationId !== operationId || state.mode !== operationMode) return;
-						results.push({ file: mergedFile, result: fallbackResult });
-					} catch (fallbackError) {
-						results.push({
-							file: { name: "merged_document.pdf" },
-							error: fallbackError instanceof Error ? fallbackError.message : "Merge failed.",
-						});
-					}
+					results.push({ file: { name: "merged_document.pdf" }, error: error instanceof Error ? error.message : "Merge failed." });
 				}
 			} else if (operationMode === "convert") {
 				const targetFormat = convertFormat || "image/jpeg";
