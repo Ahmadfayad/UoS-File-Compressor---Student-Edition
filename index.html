@@ -4124,6 +4124,145 @@
 			return makeResult(bestBlob, `${baseName}_lowdpi.pdf`, "application/pdf", originalSize, "Raster PDF (cap tuned)", true);
 		}
 
+		/**
+		 * Samples the first 3 pages of a PDF to decide whether it is text-heavy
+		 * (vector transcripts, official documents) or image-heavy (scans/photos).
+		 */
+		async function analyzePdfContent(file) {
+			const pdfjs = window.pdfjsLib;
+			pdfjs.GlobalWorkerOptions.workerSrc = "https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.js";
+			const buffer = await file.arrayBuffer();
+			const loadedPdf = await pdfjs.getDocument({ data: buffer.slice(0) }).promise;
+			const pageCount = loadedPdf.numPages;
+			const pagesToCheck = Math.min(3, pageCount);
+			const OPS = pdfjs.OPS || {};
+			const paintImageOps = new Set([
+				OPS.paintImageXObject,
+				OPS.paintInlineImageXObject,
+				OPS.paintJpegXObject,
+			].filter((op) => Number.isInteger(op)));
+
+			let textItems = 0;
+			let imageObjects = 0;
+
+			for (let pageNumber = 1; pageNumber <= pagesToCheck; pageNumber += 1) {
+				const page = await loadedPdf.getPage(pageNumber);
+				const content = await page.getTextContent();
+				textItems += content.items?.length || 0;
+				try {
+					const operatorList = await page.getOperatorList();
+					for (const fn of operatorList.fnArray) {
+						if (paintImageOps.has(fn)) imageObjects += 1;
+					}
+				} catch (error) {
+					// Operator list unavailable (e.g. encrypted stream): treat as no images found on this page.
+				}
+				page.cleanup();
+			}
+
+			const avgText = textItems / Math.max(pagesToCheck, 1);
+			const avgImages = imageObjects / Math.max(pagesToCheck, 1);
+			const isTextHeavy = avgText > 50 && avgImages < 5;
+
+			return {
+				isTextHeavy,
+				isImageHeavy: !isTextHeavy && avgImages >= 5,
+				pageCount,
+			};
+		}
+
+		/**
+		 * Lossless, vector-preserving optimization: strip metadata and re-save with
+		 * object streams (Flate compression of internal streams) — never rasterizes.
+		 */
+		async function optimizeTextHeavyPdf(file, onProgress) {
+			const originalSize = file.size;
+			const baseName = file.name.replace(/\.pdf$/i, "");
+
+			onProgress("Optimizing vectors (text preserved)…", 20);
+			const buffer = await file.arrayBuffer();
+			const pdfDoc = await window.PDFLib.PDFDocument.load(buffer, {
+				ignoreEncryption: true,
+				updateMetadata: false,
+			});
+
+			pdfDoc.setTitle("");
+			pdfDoc.setAuthor("");
+			pdfDoc.setSubject("");
+			pdfDoc.setKeywords([]);
+			pdfDoc.setProducer("");
+			pdfDoc.setCreator("");
+
+			const bytes = await pdfDoc.save({
+				useObjectStreams: true,
+				addDefaultPage: false,
+				objectsPerTick: 20,
+			});
+
+			const optimizedBlob = new Blob([bytes], { type: "application/pdf" });
+			onProgress("Vector optimization complete", 90);
+			return makeResult(optimizedBlob, `${baseName}_compressed.pdf`, "application/pdf", originalSize, "Vector-optimized (text preserved)", false);
+		}
+
+		/**
+		 * High-quality "last resort" rasterizer for text-heavy PDFs that still exceed
+		 * TARGET_MAX after lossless optimization. Starts at a high DPI/quality and
+		 * steps down only as much as needed to fit under getEffectiveCap(originalSize).
+		 */
+		async function smartRasterizeTextPdf(file, onProgress) {
+			const originalSize = file.size;
+			const baseName = file.name.replace(/\.pdf$/i, "");
+			const cap = getEffectiveCap(originalSize);
+			const buffer = await file.arrayBuffer();
+
+			onProgress("High-quality raster fallback…", 50);
+
+			const attempts = [
+				{ dpiScale: 1.8, qualityDelta: 0, minimumQuality: 0.82 },
+				{ dpiScale: 1.6, qualityDelta: -0.02, minimumQuality: 0.8 },
+				{ dpiScale: 1.4, qualityDelta: -0.04, minimumQuality: 0.78 },
+				{ dpiScale: 1.2, qualityDelta: -0.06, minimumQuality: 0.76 },
+				{ dpiScale: 1.0, qualityDelta: -0.08, minimumQuality: 0.74 },
+				{ dpiScale: 0.85, qualityDelta: -0.1, minimumQuality: 0.72 },
+				{ dpiScale: 0.7, qualityDelta: -0.12, minimumQuality: 0.7 },
+			];
+
+			let bestBlob = null;
+
+			for (let attemptIndex = 0; attemptIndex < attempts.length; attemptIndex += 1) {
+				const tuning = attempts[attemptIndex];
+				onProgress(`Rasterizing at high quality (${attemptIndex + 1}/${attempts.length})…`, 50 + Math.round((attemptIndex / attempts.length) * 40));
+
+				const candidate = await renderPdfToImagePdf(
+					buffer,
+					"high",
+					originalSize,
+					onProgress,
+					false,
+					tuning
+				);
+
+				if (candidate.size <= cap) {
+					// Keep the LARGEST (highest quality) candidate that still fits the cap.
+					if (!bestBlob || candidate.size > bestBlob.size) {
+						bestBlob = candidate;
+					}
+					if (isNearCap(candidate.size, cap)) {
+						break;
+					}
+				} else if (!bestBlob) {
+					// Track smallest over-cap candidate only in case nothing fits.
+					bestBlob = candidate;
+				}
+			}
+
+			if (!bestBlob) {
+				throw new Error("Unable to create a high-quality raster fallback PDF.");
+			}
+
+			return makeResult(bestBlob, `${baseName}_compressed.pdf`, "application/pdf", originalSize, "Rasterized (High Quality fallback)", true);
+		}
+
 		async function compressTextFile(file, onProgress) {
 			const originalSize = file.size;
 
@@ -4170,9 +4309,37 @@
 
 			try {
 				if (isPdfFile(file)) {
-					result = await compressPdf(file, levelKey, onProgress);
-					if (result.compressedSize > TARGET_MAX || !hasMeaningfulSavings(file.size, result.compressedSize)) {
-						result = await pdfToLowerDpiFallback(file, onProgress);
+					// EARLY EXIT: If already under cap, don't touch it.
+					if (file.size <= TARGET_MAX) {
+						onProgress("File already within target size", 100);
+						result = makeResult(
+							new Blob([await file.arrayBuffer()], { type: "application/pdf" }),
+							file.name,
+							"application/pdf",
+							file.size,
+							"Already optimized",
+							false
+						);
+					} else {
+						// 1. Analyze content structure (text vs. raster).
+						onProgress("Analyzing document structure...", 5);
+						const analysis = await analyzePdfContent(file);
+
+						// 2. TEXT-HEAVY PATH (e.g., transcripts): preserve vectors at all costs.
+						if (analysis.isTextHeavy) {
+							result = await optimizeTextHeavyPdf(file, onProgress);
+							if (result.compressedSize > TARGET_MAX) {
+								// Only rasterize if lossless optimization wasn't enough.
+								result = await smartRasterizeTextPdf(file, onProgress);
+							}
+						}
+						// 3. IMAGE-HEAVY / MIXED PATH (existing behavior, still cap-enforced).
+						else {
+							result = await compressPdf(file, levelKey, onProgress);
+							if (result.compressedSize > TARGET_MAX || !hasMeaningfulSavings(file.size, result.compressedSize)) {
+								result = await pdfToLowerDpiFallback(file, onProgress);
+							}
+						}
 					}
 				} else if (isTextRoute) {
 					result = await compressTextFile(file, onProgress);
