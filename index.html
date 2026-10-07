@@ -4236,20 +4236,16 @@
 					const unchanged = entry.result.compressedSize === entry.result.originalSize;
 					const outputName = entry.result.fileName || entry.file.name;
 					const formatChanged = entry.result.mime !== entry.file.type;
-					const engineLabel = entry.result.codecLabel || "";
-					const wasRasterized = entry.result.renderedPdf && isPdfFile(entry.file);
 					row.innerHTML = `
 						<div class="result-item-main">
 							<div class="result-item-name">${escapeHTML(outputName)}</div>
 							<div class="result-item-meta">
 								<span>${formatBytes(entry.result.originalSize)} -> ${formatBytes(entry.result.compressedSize)}</span>
 								<span>${entry.result.savingsPercent >= 0 ? `${entry.result.savingsPercent}% saved` : `${Math.abs(entry.result.savingsPercent)}% larger`}</span>
-								${entry.result.compressedSize <= TARGET_MAX ? "<span>Within 1 MB admission limit</span>" : ""}
-								${engineLabel ? `<span class="engine-tag">${escapeHTML(engineLabel)}</span>` : ""}
-								${wasRasterized ? `<span class="engine-warning">⚠️ Rasterized to meet 1MB limit</span>` : ""}
+								${entry.result.compressedSize <= TARGET_MAX ? "<span>Ready to upload · Under 1 MB</span>" : ""}
 								${formatChanged ? `<span>Converted from ${escapeHTML(entry.file.name)}</span>` : ""}
-								${entry.result.renderedPdf && isPdfFile(entry.file) ? "<span>Rasterized PDF: text search and interactive content are not preserved.</span>" : ""}
-								${entry.result.signatureInvalidated ? "<span class='engine-warning'>Sharing copy: original digital signature verification and credential metadata are not preserved. Keep the original.</span>" : ""}
+								${entry.result.renderedPdf && isPdfFile(entry.file) ? "<span>This copy may not support text search or fillable fields.</span>" : ""}
+								${entry.result.signatureInvalidated ? "<span>Keep your original document for official verification.</span>" : ""}
 								${unchanged ? "<span>Already within the size limit; original file kept.</span>" : ""}
 							</div>
 						</div>
