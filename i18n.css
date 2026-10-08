@@ -34,7 +34,7 @@ input[type='email'], input[type='password'], input[type='date'], #split-range-in
 #info-banner.open { max-height: none; }
 .tool-heading { position: relative; display: flex; justify-content: center; align-items: center; gap: 6px; margin-bottom: 10px; }
 .tool-heading .mode-switch-label { margin: 0; }
-.tool-help summary { list-style: none; min-width: 44px; min-height: 44px; cursor: pointer; }
+.tool-help summary { display: grid; place-items: center; list-style: none; min-width: 44px; min-height: 44px; cursor: pointer; }
 .tool-help summary::-webkit-details-marker { display: none; }
 .tool-help summary:focus-visible { outline: 2px solid var(--green); outline-offset: 2px; }
 .tool-help-copy { position: absolute; z-index: 5; inset-inline: 0; top: 100%; padding: 18px; border: 1px solid #174f2326; border-radius: 16px; background: #f8fdf8; box-shadow: 0 12px 30px #174f2320; text-align: start; font-size: 12px; line-height: 1.7; }
