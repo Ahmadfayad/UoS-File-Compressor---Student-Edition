@@ -54,11 +54,13 @@ function csvCell(value) {
 	return `"${text.replace(/"/g, '""')}"`;
 }
 
-function makeCsv(rows) {
+const ARABIC_SERVICES = {compress:'ضغط',convert:'تحويل',merge:'دمج',split:'تقسيم'};
+const ARABIC_HEADERS = ['الرقم المرجعي','تاريخ الإرسال (UTC)','التقييم','الخدمة','التعليق'];
+function makeCsv(rows, language = 'en') {
 	const columns = ['id', 'created_at', 'rating', 'tool_mode', 'comment'];
 	return [
-		columns.map(csvCell).join(','),
-		...rows.map((row) => columns.map((column) => csvCell(row[column])).join(',')),
+		(language === 'ar' ? ARABIC_HEADERS : columns).map(csvCell).join(','),
+		...rows.map((row) => columns.map((column) => csvCell(language === 'ar' && column === 'tool_mode' ? ARABIC_SERVICES[row[column]] || row[column] : row[column])).join(',')),
 	].join('\r\n');
 }
 
@@ -88,6 +90,7 @@ module.exports = async function handler(req, res) {
 	catch { return res.status(503).json({ error: 'Admin sign-in is temporarily unavailable.' }); }
 
 	const query = req.query || {};
+	const arabic = query.language === 'ar';
 	const action = typeof query.action === 'string' ? query.action : '';
 	if (action === 'verify') return res.status(204).end();
 
@@ -114,16 +117,17 @@ module.exports = async function handler(req, res) {
 		if (format === 'json') return res.status(200).json({ rows, canDelete: actor.owner || actor.email === 'aalbalbissi@sharjah.ac.ae', timezone: query.timezone || 'Asia/Dubai', bounds });
 		if (format === 'xlsx') {
 			const workbook = new ExcelJS.Workbook();
-			const sheet = workbook.addWorksheet('Customer feedback');
+			const sheet = workbook.addWorksheet(arabic ? 'تقييمات المستفيدين' : 'Customer feedback');
 			sheet.columns = [{header:'ID',key:'id',width:12},{header:'Submitted (UTC)',key:'created_at',width:28},{header:'Rating',key:'rating',width:10},{header:'Service',key:'tool_mode',width:16},{header:'Comment',key:'comment',width:70}];
-			for (const row of rows) sheet.addRow({...row, created_at: new Date(row.created_at).toISOString()});
-			sheet.getRow(1).font = {bold:true}; sheet.views = [{state:'frozen',ySplit:1}];
+			if (arabic) sheet.columns.forEach((column,index) => {column.header=ARABIC_HEADERS[index];});
+			for (const row of rows) sheet.addRow({...row, tool_mode: arabic ? ARABIC_SERVICES[row.tool_mode] || row.tool_mode : row.tool_mode, created_at: new Date(row.created_at).toISOString()});
+			sheet.getRow(1).font = {bold:true}; sheet.views = [{state:'frozen',ySplit:1,rightToLeft:arabic}];
 			sheet.autoFilter = {from:'A1',to:'E1'}; sheet.getColumn('comment').alignment = {wrapText:true,vertical:'top'};
 			res.setHeader('Content-Type','application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
 			res.setHeader('Content-Disposition',`attachment; filename="customer-feedback-${period}-${mode}.xlsx"`);
 			return res.status(200).send(Buffer.from(await workbook.xlsx.writeBuffer()));
 		}
-		const csv = `\uFEFF${makeCsv(rows)}`;
+		const csv = `\uFEFF${makeCsv(rows, arabic ? 'ar' : 'en')}`;
 		const modeSuffix = mode === 'all' ? 'all-services' : mode;
 		const filename = `customer-feedback-${period}-${modeSuffix}.csv`;
 		res.setHeader('Content-Type', 'text/csv; charset=utf-8');

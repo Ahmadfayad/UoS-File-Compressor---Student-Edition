@@ -1,5 +1,6 @@
 api/*.test.js
 pdf-compression.test.js
+i18n.test.js
 tmp/
 output/
 node_modules/

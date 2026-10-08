@@ -50,6 +50,11 @@ const result=await invoke(exporter,req('GET',{},cookie,query));assert.equal(resu
 const workbook=new ExcelJS.Workbook();await workbook.xlsx.load(result.payload);const cell=workbook.worksheets[0].getCell('E2');assert.equal(cell.value,feedback[0].comment);assert.equal(cell.type,ExcelJS.ValueType.String);
 const q=queries.findLast(x=>x.sql.includes('FROM public.customer_feedback'));assert.ok(q.values.includes('2024-02-29T20:00:00.000Z'));assert.ok(q.values.includes('2024-03-01T20:00:00.000Z'));assert.ok(q.values.includes('compress'));
 assert.equal((await invoke(exporter,req('GET',{},cookie,{format:'pdf'}))).statusCode,400);
+const arabicResult=await invoke(exporter,req('GET',{},cookie,{...query,language:'ar'}));
+const arabicWorkbook=new ExcelJS.Workbook();await arabicWorkbook.xlsx.load(arabicResult.payload);
+const arabicSheet=arabicWorkbook.worksheets[0];assert.equal(arabicSheet.name,'تقييمات المستفيدين');
+assert.equal(arabicSheet.getCell('A1').value,'الرقم المرجعي');assert.equal(arabicSheet.views[0].rightToLeft,true);
+assert.equal(arabicSheet.getCell('D2').value,'ضغط');assert.equal(arabicSheet.getCell('E2').value,feedback[0].comment);
 });
 test('historical dates and Dubai midnight handle leap months and year boundaries',()=>{
 const bounds=exporter.getDateBounds;

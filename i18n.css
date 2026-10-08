@@ -1,0 +1,52 @@
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+Arabic:wght@400;500;600;700;800&display=swap');
+.language-control { display: flex; flex-direction: column; align-items: center; gap: 3px; flex: 0 0 auto; }
+.language-switch { display: flex; direction: ltr; padding: 3px; border: 1px solid #174f2326; border-radius: 12px; background: #ffffffd9; }
+.language-switch button { min-height: 44px; min-width: 66px; padding: 8px 12px; border: 0; border-radius: 9px; background: transparent; color: #174f23; font: inherit; font-size: 12px; font-weight: 700; cursor: pointer; }
+.language-switch button[aria-pressed='true'] { background: #174f23; color: white; }
+.language-switch button:focus-visible { outline: 2px solid #c5960c; outline-offset: 2px; }
+.language-source { font-size: 10px; line-height: 1.5; color: #617364; }
+html[lang='ar'] body, html[lang='ar'] button, html[lang='ar'] input, html[lang='ar'] select, html[lang='ar'] textarea { font-family: 'Noto Sans Arabic', 'Segoe UI', Tahoma, sans-serif; }
+html[lang='ar'] { letter-spacing: normal; }
+html[lang='ar'] .title h2 { line-height: 1.6; }
+html[lang='ar'] .mode-tab, html[lang='ar'] .dlmode-opt, html[lang='ar'] th, html[lang='ar'] td { text-align: start; }
+html[lang='ar'] .mode-tab-title, html[lang='ar'] .section-label, html[lang='ar'] .feedback-eyebrow, html[lang='ar'] .eyebrow { letter-spacing: normal; }
+html[dir='rtl'] .feedback-tab { right: auto; left: 22px; }
+html[dir='rtl'] .preview-card-page-badge { left: auto; right: 6px; }
+html[dir='rtl'] .preview-card-checkbox { right: auto; left: 6px; }
+.file-list-item-name, .result-item-name, #progress-name, [data-no-i18n] { unicode-bidi: plaintext; }
+html[dir='rtl'] .result-item-meta > span:first-child { direction: ltr; unicode-bidi: isolate; }
+input[type='email'], input[type='password'], input[type='date'], #split-range-input { direction: ltr; text-align: start; }
+.admin-header-actions { display: flex; align-items: center; gap: 18px; flex-wrap: wrap; }
+@media (max-width: 640px) {
+  .header-inner { flex-direction: column; gap: 8px; padding: 10px 12px; }
+  .header-inner .brand { width: auto; }
+  .header-inner .brand img { max-width: min(82vw, 280px); }
+  .header-inner .header-actions { position: static; transform: none; justify-content: center; gap: 12px; }
+  .language-switch button { min-width: 80px; }
+  html[dir='rtl'] .feedback-tab { left: 14px; right: auto; }
+  html[lang='ar'] .title h2 { font-size: 24px; line-height: 1.6; }
+  .admin-header-actions { width: 100%; justify-content: space-between; gap: 12px; }
+  .actions button { flex: 1 1 100%; }
+  .dates { grid-template-columns: 1fr; }
+}
+
+/* Shared help controls work with touch, keyboard, and either reading direction. */
+#info-banner.open { max-height: none; }
+.tool-heading { margin-bottom: 10px; }
+.tool-heading .mode-switch-label { margin: 0; }
+.tool-help summary { display: flex; justify-content: center; align-items: center; gap: 6px; list-style: none; cursor: pointer; }
+.tool-help summary .icon-btn { display: grid; place-items: center; min-width: 44px; min-height: 44px; flex-shrink: 0; }
+.tool-help summary::-webkit-details-marker { display: none; }
+.tool-help summary:focus-visible { outline: 2px solid var(--green); outline-offset: 2px; }
+.tool-help-copy { margin-top: 10px; padding: 18px; border: 1px solid #174f2326; border-radius: 16px; background: #f8fdf8; box-shadow: 0 12px 30px #174f2320; text-align: start; font-size: 12px; line-height: 1.7; }
+.tool-help-copy h3 { color: var(--green); font-size: 14px; margin-bottom: 6px; }
+.tool-help-copy ul { padding-inline-start: 20px; margin-block: 8px; }
+.tool-help-copy li + li { margin-top: 4px; }
+.footer-inner { justify-content: center; gap: 8px 12px; text-align: center; }
+.footer-inner > p + p::before { content: '•'; margin-inline-end: 12px; }
+.footer-office strong { color: #435647; font-weight: 700; }
+@media (max-width: 640px) {
+  .footer-inner { flex-direction: column; gap: 5px; padding-block: 12px; }
+  .footer-inner > p + p::before { content: none; }
+  .tool-help-copy { padding: 14px; }
+}
